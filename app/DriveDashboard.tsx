@@ -807,6 +807,11 @@ export function DriveDashboard() {
     }
   }
 
+  async function signOut() {
+    await fetch("/api/access", { method: "DELETE" });
+    window.location.assign("/access");
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -814,9 +819,14 @@ export function DriveDashboard() {
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-name">4DV Studio</span>
         </div>
-        <div className="sync-status">
-          <span className="sync-dot" aria-hidden="true" />
-          <span>History tracking on</span>
+        <div className="topbar-actions">
+          <div className="sync-status">
+            <span className="sync-dot" aria-hidden="true" />
+            <span>History tracking on</span>
+          </div>
+          <button className="signout-button" onClick={() => void signOut()}>
+            Lock
+          </button>
         </div>
       </header>
 

@@ -3,9 +3,12 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("build contains the finished 4DV Studio hard drive tracker", async () => {
-  const [dashboard, driveApi, layout, hosting] = await Promise.all([
+  const [dashboard, driveApi, accessPage, accessApi, auth, layout, hosting] = await Promise.all([
     readFile(new URL("../app/DriveDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/drives/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/access/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/access/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/tracker-auth.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../dist/.openai/hosting.json", import.meta.url), "utf8"),
     access(new URL("../dist/server/index.js", import.meta.url)),
@@ -22,6 +25,12 @@ test("build contains the finished 4DV Studio hard drive tracker", async () => {
   assert.match(dashboard, /Edit selected drives/);
   assert.match(driveApi, /bulk-updated/);
   assert.match(driveApi, /Select between 1 and 100 valid drives/);
+  assert.match(driveApi, /requireTrackerAccess/);
+  assert.match(accessPage, /Protected workspace/);
+  assert.match(accessApi, /trackerAccessCookie/);
+  assert.match(auth, /HttpOnly/);
+  assert.match(auth, /TRACKER_PASSWORD/);
+  assert.doesNotMatch(`${dashboard}\n${driveApi}\n${accessPage}\n${accessApi}\n${auth}`, /fanxyytracking/);
   assert.match(layout, /4DV Studio — Hard Drive Tracking System/);
   assert.doesNotMatch(
     dashboard,

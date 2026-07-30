@@ -8,6 +8,7 @@ import {
   summarizeChanges,
   type DriveRecord,
 } from "../../../db/drive-store";
+import { requireTrackerAccess } from "../../../lib/tracker-auth";
 
 type DrivePayload = {
   id?: number;
@@ -175,6 +176,8 @@ function errorResponse(error: unknown) {
 
 export async function GET(request: Request) {
   try {
+    const accessResponse = await requireTrackerAccess(request);
+    if (accessResponse) return accessResponse;
     const d1 = await ensureDriveDatabase();
     const url = new URL(request.url);
     const historyFor = Number(url.searchParams.get("historyFor"));
@@ -270,6 +273,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const accessResponse = await requireTrackerAccess(request);
+    if (accessResponse) return accessResponse;
     const d1 = await ensureDriveDatabase();
     const drive = cleanPayload((await request.json()) as DrivePayload);
     const result = await d1
@@ -317,6 +322,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const accessResponse = await requireTrackerAccess(request);
+    if (accessResponse) return accessResponse;
     const d1 = await ensureDriveDatabase();
     const payload = (await request.json()) as DrivePayload;
 
@@ -416,6 +423,8 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const accessResponse = await requireTrackerAccess(request);
+    if (accessResponse) return accessResponse;
     const d1 = await ensureDriveDatabase();
     const payload = (await request.json()) as DrivePayload;
     const id = Number(payload.id);
