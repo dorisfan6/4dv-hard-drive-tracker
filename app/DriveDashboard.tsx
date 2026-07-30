@@ -807,11 +807,6 @@ export function DriveDashboard() {
     }
   }
 
-  async function signOut() {
-    await fetch("/api/access", { method: "DELETE" });
-    window.location.assign("/access");
-  }
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -824,9 +819,6 @@ export function DriveDashboard() {
             <span className="sync-dot" aria-hidden="true" />
             <span>History tracking on</span>
           </div>
-          <button className="signout-button" onClick={() => void signOut()}>
-            Lock
-          </button>
         </div>
       </header>
 
