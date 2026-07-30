@@ -20,3 +20,12 @@ export function getD1() {
   }
   return env.DB;
 }
+
+export function getPhotosBucket() {
+  if (!env.PHOTOS) {
+    throw new Error(
+      "Photo storage is unavailable. Please try again in a moment.",
+    );
+  }
+  return env.PHOTOS;
+}

@@ -14,12 +14,15 @@ test("build contains the finished Drive Ledger application", async () => {
   assert.match(dashboard, /Know what’s on/);
   assert.match(dashboard, /Drive inventory/);
   assert.match(dashboard, /\/api\/drives/);
+  assert.match(dashboard, /Waiting to be processed/);
+  assert.match(dashboard, /History/);
   assert.match(layout, /Drive Ledger — Hard Drive Tracking/);
   assert.match(layout, /og\.png/);
   assert.doesNotMatch(`${dashboard}\n${layout}`, /codex-preview|SkeletonPreview/);
 
   const hostingConfig = JSON.parse(hosting);
   assert.equal(hostingConfig.d1, "DB");
+  assert.equal(hostingConfig.r2, "PHOTOS");
   assert.equal(
     hostingConfig.project_id,
     "appgprj_6a6a91425c5081919c981556de242884",

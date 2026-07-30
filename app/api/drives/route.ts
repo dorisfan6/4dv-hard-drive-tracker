@@ -1,4 +1,13 @@
-import { getD1 } from "../../../db";
+import {
+  buildChanges,
+  ensureDriveDatabase,
+  getDriveById,
+  recordHistory,
+  selectDriveFields,
+  serializeDrive,
+  summarizeChanges,
+  type DriveRecord,
+} from "../../../db/drive-store";
 
 type DrivePayload = {
   id?: number;
@@ -10,192 +19,17 @@ type DrivePayload = {
   spaceLeftGb?: number;
   contents?: string;
   deletePermission?: string;
+  brand?: string;
+  customBrand?: string;
+  locationType?: string;
   location?: string;
   note?: string;
 };
 
-const validStatuses = new Set([
-  "ready",
-  "in-use",
-  "full",
-  "archive",
-  "needs-review",
-]);
-
+const validStatuses = new Set(["waiting", "processing", "processed"]);
 const validPermissions = new Set(["clear", "ask", "protected"]);
-
-const selectDrivesSql = `
-  SELECT
-    id,
-    drive_number AS driveNumber,
-    label,
-    date,
-    status,
-    total_gb AS totalGb,
-    space_left_gb AS spaceLeftGb,
-    contents,
-    delete_permission AS deletePermission,
-    location,
-    note,
-    updated_at AS updatedAt
-  FROM drives
-  ORDER BY drive_number COLLATE NOCASE ASC
-`;
-
-const seedDrives = [
-  {
-    driveNumber: "BR-01",
-    label: "PRIMARY RAID",
-    date: "2026-07-29",
-    status: "in-use",
-    totalGb: 8000,
-    spaceLeftGb: 1200,
-    contents: "Neemo MVC, Rain selects, Working exports",
-    deletePermission: "ask",
-    location: "Edit Bay A",
-    note: "Current edit — confirm with post before clearing.",
-  },
-  {
-    driveNumber: "BR-02",
-    label: "SHUTTLE A",
-    date: "2026-07-28",
-    status: "ready",
-    totalGb: 4000,
-    spaceLeftGb: 3600,
-    contents: "Verified backup only",
-    deletePermission: "clear",
-    location: "Shelf A · 02",
-    note: "Ready for the next transfer.",
-  },
-  {
-    driveNumber: "BR-03",
-    label: "MASTER ARCHIVE",
-    date: "2026-07-24",
-    status: "archive",
-    totalGb: 8000,
-    spaceLeftGb: 420,
-    contents: "Burberry Rain masters, ProRes finals, Audio masters",
-    deletePermission: "protected",
-    location: "Archive cabinet",
-    note: "Two-copy master archive. Do not repurpose.",
-  },
-  {
-    driveNumber: "BR-04",
-    label: "4DV CAPTURE",
-    date: "2026-07-29",
-    status: "full",
-    totalGb: 2000,
-    spaceLeftGb: 80,
-    contents: "4DV source, Fog tests, Capture cache",
-    deletePermission: "ask",
-    location: "Capture station",
-    note: "Check whether source is on BR-03 before deleting cache.",
-  },
-  {
-    driveNumber: "BR-05",
-    label: "FIELD DRIVE",
-    date: "2026-07-27",
-    status: "ready",
-    totalGb: 4000,
-    spaceLeftGb: 2800,
-    contents: "Rain coat wet, DNRain, Camera reports",
-    deletePermission: "clear",
-    location: "Shelf A · 05",
-    note: "Originals copied to archive.",
-  },
-  {
-    driveNumber: "BR-06",
-    label: "REVIEW / TEMP",
-    date: "2026-07-21",
-    status: "needs-review",
-    totalGb: 5000,
-    spaceLeftGb: 4100,
-    contents: "Old exports, Temp renders, Review links",
-    deletePermission: "ask",
-    location: "Post desk",
-    note: "Likely reusable after producer approval.",
-  },
-];
-
-async function ensureDatabase() {
-  const d1 = getD1();
-  await d1.batch([
-    d1.prepare(`
-      CREATE TABLE IF NOT EXISTS drives (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        drive_number TEXT NOT NULL UNIQUE,
-        label TEXT NOT NULL DEFAULT '',
-        date TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'ready',
-        total_gb INTEGER NOT NULL,
-        space_left_gb INTEGER NOT NULL,
-        contents TEXT NOT NULL DEFAULT '',
-        delete_permission TEXT NOT NULL DEFAULT 'ask',
-        location TEXT NOT NULL DEFAULT '',
-        note TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `),
-    d1.prepare(`
-      CREATE TABLE IF NOT EXISTS app_state (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      )
-    `),
-    d1.prepare(`
-      CREATE UNIQUE INDEX IF NOT EXISTS drives_drive_number_idx
-      ON drives (drive_number)
-    `),
-  ]);
-
-  const seeded = await d1
-    .prepare("SELECT value FROM app_state WHERE key = ?")
-    .bind("sample_seeded")
-    .first<{ value: string }>();
-
-  if (!seeded) {
-    const count = await d1
-      .prepare("SELECT COUNT(*) AS count FROM drives")
-      .first<{ count: number }>();
-
-    const statements = [];
-    if (!count?.count) {
-      for (const drive of seedDrives) {
-        statements.push(
-          d1
-            .prepare(`
-              INSERT INTO drives (
-                drive_number, label, date, status, total_gb, space_left_gb,
-                contents, delete_permission, location, note
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `)
-            .bind(
-              drive.driveNumber,
-              drive.label,
-              drive.date,
-              drive.status,
-              drive.totalGb,
-              drive.spaceLeftGb,
-              drive.contents,
-              drive.deletePermission,
-              drive.location,
-              drive.note,
-            ),
-        );
-      }
-    }
-
-    statements.push(
-      d1
-        .prepare("INSERT INTO app_state (key, value) VALUES (?, ?)")
-        .bind("sample_seeded", "true"),
-    );
-    await d1.batch(statements);
-  }
-
-  return d1;
-}
+const validBrands = new Set(["samsung", "sandisk", "other"]);
+const validLocations = new Set(["4dv-studio", "data-center", "other"]);
 
 function cleanPayload(payload: DrivePayload) {
   const driveNumber = payload.driveNumber?.trim().toUpperCase() ?? "";
@@ -203,14 +37,24 @@ function cleanPayload(payload: DrivePayload) {
   const date = payload.date?.trim() || new Date().toISOString().slice(0, 10);
   const status = validStatuses.has(payload.status ?? "")
     ? payload.status!
-    : "ready";
+    : "waiting";
   const totalGb = Math.round(Number(payload.totalGb));
   const spaceLeftGb = Math.round(Number(payload.spaceLeftGb));
   const contents = payload.contents?.trim() ?? "";
   const deletePermission = validPermissions.has(payload.deletePermission ?? "")
     ? payload.deletePermission!
     : "ask";
-  const location = payload.location?.trim() ?? "";
+  const brand = validBrands.has(payload.brand ?? "") ? payload.brand! : "other";
+  const customBrand = brand === "other" ? payload.customBrand?.trim() ?? "" : "";
+  const locationType = validLocations.has(payload.locationType ?? "")
+    ? payload.locationType!
+    : "other";
+  const location =
+    locationType === "4dv-studio"
+      ? "4DV Studio"
+      : locationType === "data-center"
+        ? "Data Center"
+        : payload.location?.trim() ?? "";
   const note = payload.note?.trim() ?? "";
 
   if (!driveNumber) throw new Error("Hard drive # is required.");
@@ -234,6 +78,9 @@ function cleanPayload(payload: DrivePayload) {
     spaceLeftGb,
     contents,
     deletePermission,
+    brand,
+    customBrand,
+    locationType,
     location,
     note,
   };
@@ -252,11 +99,50 @@ function errorResponse(error: unknown) {
   );
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const d1 = await ensureDatabase();
-    const result = await d1.prepare(selectDrivesSql).all();
-    return Response.json({ drives: result.results });
+    const d1 = await ensureDriveDatabase();
+    const url = new URL(request.url);
+    const historyFor = Number(url.searchParams.get("historyFor"));
+
+    if (Number.isInteger(historyFor) && historyFor > 0) {
+      const result = await d1
+        .prepare(`
+          SELECT
+            id,
+            action,
+            summary,
+            changes_json AS changesJson,
+            before_snapshot AS beforeSnapshot,
+            after_snapshot AS afterSnapshot,
+            created_at AS createdAt
+          FROM drive_history
+          WHERE drive_id = ?
+          ORDER BY created_at DESC, id DESC
+        `)
+        .bind(historyFor)
+        .all<{
+          id: number;
+          action: string;
+          summary: string;
+          changesJson: string;
+          beforeSnapshot: string;
+          afterSnapshot: string;
+          createdAt: string;
+        }>();
+      return Response.json({
+        history: result.results.map((entry) => ({
+          ...entry,
+          changes: JSON.parse(entry.changesJson || "[]"),
+          changesJson: undefined,
+        })),
+      });
+    }
+
+    const result = await d1
+      .prepare(`${selectDriveFields} ORDER BY drive_number COLLATE NOCASE ASC`)
+      .all<DriveRecord>();
+    return Response.json({ drives: result.results.map(serializeDrive) });
   } catch (error) {
     return errorResponse(error);
   }
@@ -264,14 +150,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const d1 = await ensureDatabase();
+    const d1 = await ensureDriveDatabase();
     const drive = cleanPayload((await request.json()) as DrivePayload);
     const result = await d1
       .prepare(`
         INSERT INTO drives (
           drive_number, label, date, status, total_gb, space_left_gb,
-          contents, delete_permission, location, note
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          contents, delete_permission, brand, custom_brand,
+          location_type, location, note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `)
       .bind(
@@ -283,11 +170,26 @@ export async function POST(request: Request) {
         drive.spaceLeftGb,
         drive.contents,
         drive.deletePermission,
+        drive.brand,
+        drive.customBrand,
+        drive.locationType,
         drive.location,
         drive.note,
       )
       .first<{ id: number }>();
-    return Response.json({ id: result?.id }, { status: 201 });
+    if (!result?.id) throw new Error("Could not create drive record.");
+    const created = await getDriveById(d1, result.id);
+    if (!created) throw new Error("Could not load the new drive record.");
+    await recordHistory(
+      d1,
+      result.id,
+      "created",
+      "Drive registered",
+      null,
+      created,
+      [],
+    );
+    return Response.json({ id: result.id }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
   }
@@ -295,14 +197,16 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const d1 = await ensureDatabase();
+    const d1 = await ensureDriveDatabase();
     const payload = (await request.json()) as DrivePayload;
     const id = Number(payload.id);
     if (!Number.isInteger(id) || id <= 0) {
       return Response.json({ error: "A valid drive id is required." }, { status: 400 });
     }
+    const before = await getDriveById(d1, id);
+    if (!before) return Response.json({ error: "Drive not found." }, { status: 404 });
     const drive = cleanPayload(payload);
-    const result = await d1
+    await d1
       .prepare(`
         UPDATE drives SET
           drive_number = ?,
@@ -313,6 +217,9 @@ export async function PATCH(request: Request) {
           space_left_gb = ?,
           contents = ?,
           delete_permission = ?,
+          brand = ?,
+          custom_brand = ?,
+          location_type = ?,
           location = ?,
           note = ?,
           updated_at = CURRENT_TIMESTAMP
@@ -327,13 +234,27 @@ export async function PATCH(request: Request) {
         drive.spaceLeftGb,
         drive.contents,
         drive.deletePermission,
+        drive.brand,
+        drive.customBrand,
+        drive.locationType,
         drive.location,
         drive.note,
         id,
       )
       .run();
-    if (!result.meta.changes) {
-      return Response.json({ error: "Drive not found." }, { status: 404 });
+    const after = await getDriveById(d1, id);
+    if (!after) throw new Error("Could not load the updated drive.");
+    const changes = buildChanges(before, after);
+    if (changes.length) {
+      await recordHistory(
+        d1,
+        id,
+        "updated",
+        summarizeChanges(changes),
+        before,
+        after,
+        changes,
+      );
     }
     return Response.json({ ok: true });
   } catch (error) {
@@ -343,17 +264,17 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const d1 = await ensureDatabase();
+    const d1 = await ensureDriveDatabase();
     const payload = (await request.json()) as DrivePayload;
     const id = Number(payload.id);
     if (!Number.isInteger(id) || id <= 0) {
       return Response.json({ error: "A valid drive id is required." }, { status: 400 });
     }
-    const result = await d1
-      .prepare("DELETE FROM drives WHERE id = ?")
-      .bind(id)
-      .run();
-    if (!result.meta.changes) {
+    const results = await d1.batch([
+      d1.prepare("DELETE FROM drive_history WHERE drive_id = ?").bind(id),
+      d1.prepare("DELETE FROM drives WHERE id = ?").bind(id),
+    ]);
+    if (!results[1]?.meta.changes) {
       return Response.json({ error: "Drive not found." }, { status: 404 });
     }
     return Response.json({ ok: true });
