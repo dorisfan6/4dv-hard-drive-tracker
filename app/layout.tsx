@@ -23,10 +23,9 @@ export async function generateMetadata(): Promise<Metadata> {
     requestHeaders.get("x-forwarded-proto") ??
     (host.includes("localhost") ? "http" : "https");
   const metadataBase = new URL(`${protocol}://${host}`);
-  const title = "Drive Ledger — Hard Drive Tracking";
+  const title = "4DV Studio — Hard Drive Tracking System";
   const description =
-    "Track every production drive, processing status, photos, location, and a complete history of what changed.";
-  const socialImage = new URL("/og.png", metadataBase).toString();
+    "Track hard drive contents, processing status, storage, physical location, photos, and important change history.";
 
   return {
     metadataBase,
@@ -34,15 +33,13 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     openGraph: {
       title,
-      description: "A shared drive inventory with photos and automatic change history.",
+      description,
       type: "website",
-      images: [{ url: socialImage, width: 1536, height: 1024 }],
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary",
       title,
-      description: "A shared drive inventory with photos and automatic change history.",
-      images: [socialImage],
+      description,
     },
   };
 }

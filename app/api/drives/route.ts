@@ -30,6 +30,16 @@ const validStatuses = new Set(["waiting", "processing", "processed"]);
 const validPermissions = new Set(["clear", "ask", "protected"]);
 const validBrands = new Set(["samsung", "sandisk", "other"]);
 const validLocations = new Set(["4dv-studio", "data-center", "other"]);
+const globalHistoryFields = new Set([
+  "status",
+  "location",
+  "contents",
+  "totalGb",
+  "spaceLeftGb",
+  "brand",
+  "customBrand",
+  "photoName",
+]);
 
 function cleanPayload(payload: DrivePayload) {
   const driveNumber = payload.driveNumber?.trim().toUpperCase() ?? "";
@@ -104,6 +114,52 @@ export async function GET(request: Request) {
     const d1 = await ensureDriveDatabase();
     const url = new URL(request.url);
     const historyFor = Number(url.searchParams.get("historyFor"));
+
+    if (url.searchParams.get("history") === "all") {
+      const result = await d1
+        .prepare(`
+          SELECT
+            h.id,
+            h.drive_id AS driveId,
+            d.drive_number AS driveNumber,
+            d.label AS driveLabel,
+            h.action,
+            h.summary,
+            h.changes_json AS changesJson,
+            h.before_snapshot AS beforeSnapshot,
+            h.after_snapshot AS afterSnapshot,
+            h.created_at AS createdAt
+          FROM drive_history h
+          INNER JOIN drives d ON d.id = h.drive_id
+          ORDER BY h.created_at DESC, h.id DESC
+          LIMIT 500
+        `)
+        .all<{
+          id: number;
+          driveId: number;
+          driveNumber: string;
+          driveLabel: string;
+          action: string;
+          summary: string;
+          changesJson: string;
+          beforeSnapshot: string;
+          afterSnapshot: string;
+          createdAt: string;
+        }>();
+      const history = result.results.flatMap((entry) => {
+        const changes = (JSON.parse(entry.changesJson || "[]") as Array<{
+          field: string;
+          label: string;
+          before: string | number | null;
+          after: string | number | null;
+        }>).filter((change) => globalHistoryFields.has(change.field));
+        if (!changes.length && !["baseline", "created"].includes(entry.action)) {
+          return [];
+        }
+        return [{ ...entry, changesJson: undefined, changes }];
+      });
+      return Response.json({ history });
+    }
 
     if (Number.isInteger(historyFor) && historyFor > 0) {
       const result = await d1

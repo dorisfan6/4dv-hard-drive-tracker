@@ -8,6 +8,8 @@ type Brand = "samsung" | "sandisk" | "other";
 type LocationType = "4dv-studio" | "data-center" | "other";
 type Filter = "all" | DriveStatus;
 type ModalTab = "details" | "history";
+type PageTab = "inventory" | "history";
+type HistoryFilter = "all" | "status" | "location" | "contents" | "capacity" | "brand" | "photo";
 
 type Drive = {
   id: number;
@@ -64,6 +66,24 @@ type HistoryEntry = {
   createdAt: string;
 };
 
+type GlobalHistoryEntry = HistoryEntry & {
+  driveId: number;
+  driveNumber: string;
+  driveLabel: string;
+};
+
+type GlobalHistoryRow = {
+  id: string;
+  driveId: number;
+  driveNumber: string;
+  driveLabel: string;
+  field: string;
+  label: string;
+  before: string | number | null;
+  after: string | number | null;
+  createdAt: string;
+};
+
 const blankForm: DriveForm = {
   driveNumber: "",
   label: "",
@@ -98,6 +118,28 @@ const filters: Array<{ value: Filter; label: string }> = [
   { value: "processing", label: "Processing" },
   { value: "processed", label: "Processed" },
 ];
+
+const historyFilters: Array<{ value: HistoryFilter; label: string }> = [
+  { value: "all", label: "All activity" },
+  { value: "status", label: "Status" },
+  { value: "location", label: "Location" },
+  { value: "contents", label: "Contents" },
+  { value: "capacity", label: "Capacity" },
+  { value: "brand", label: "Brand" },
+  { value: "photo", label: "Photo" },
+];
+
+const historyFieldGroups: Record<string, Exclude<HistoryFilter, "all">> = {
+  status: "status",
+  location: "location",
+  locationType: "location",
+  contents: "contents",
+  totalGb: "capacity",
+  spaceLeftGb: "capacity",
+  brand: "brand",
+  customBrand: "brand",
+  photoName: "photo",
+};
 
 function formatStorage(gb: number) {
   if (gb >= 1000) {
@@ -242,6 +284,7 @@ export function DriveDashboard() {
   const [drives, setDrives] = useState<Drive[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activePageTab, setActivePageTab] = useState<PageTab>("inventory");
   const [formError, setFormError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -254,6 +297,11 @@ export function DriveDashboard() {
   const [toast, setToast] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [globalHistory, setGlobalHistory] = useState<GlobalHistoryEntry[]>([]);
+  const [globalHistoryLoading, setGlobalHistoryLoading] = useState(false);
+  const [globalHistoryLoaded, setGlobalHistoryLoaded] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
 
@@ -301,9 +349,43 @@ export function DriveDashboard() {
     }
   }
 
+  async function loadGlobalHistory() {
+    setGlobalHistoryLoading(true);
+    try {
+      setError("");
+      const response = await fetch("/api/drives?history=all", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as {
+        history?: GlobalHistoryEntry[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not load activity history.");
+      }
+      setGlobalHistory(payload.history || []);
+      setGlobalHistoryLoaded(true);
+    } catch (historyError) {
+      setError(
+        historyError instanceof Error
+          ? historyError.message
+          : "Could not load activity history.",
+      );
+    } finally {
+      setGlobalHistoryLoading(false);
+    }
+  }
+
   useEffect(() => {
-    void loadDrives();
+    const timer = window.setTimeout(() => void loadDrives(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (activePageTab !== "history" || globalHistoryLoaded) return;
+    const timer = window.setTimeout(() => void loadGlobalHistory(), 0);
+    return () => window.clearTimeout(timer);
+  }, [activePageTab, globalHistoryLoaded]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -375,6 +457,56 @@ export function DriveDashboard() {
       return matchesSearch && matchesFilter;
     });
   }, [drives, filter, search]);
+
+  const globalHistoryRows = useMemo<GlobalHistoryRow[]>(() => {
+    const rows = globalHistory.flatMap((entry) => {
+      if (entry.changes.length) {
+        return entry.changes.map((change) => ({
+          id: `${entry.id}-${change.field}`,
+          driveId: entry.driveId,
+          driveNumber: entry.driveNumber,
+          driveLabel: entry.driveLabel,
+          field: change.field,
+          label: `${change.label} changed`,
+          before: change.before,
+          after: change.after,
+          createdAt: entry.createdAt,
+        }));
+      }
+      return [
+        {
+          id: `${entry.id}-${entry.action}`,
+          driveId: entry.driveId,
+          driveNumber: entry.driveNumber,
+          driveLabel: entry.driveLabel,
+          field: "record",
+          label: entry.summary,
+          before: null,
+          after: baselineContents(entry),
+          createdAt: entry.createdAt,
+        },
+      ];
+    });
+    const query = historySearch.trim().toLowerCase();
+    return rows.filter((row) => {
+      const group = historyFieldGroups[row.field];
+      const matchesFilter =
+        historyFilter === "all" || group === historyFilter;
+      const matchesSearch =
+        !query ||
+        [
+          row.driveNumber,
+          row.driveLabel,
+          row.label,
+          historyValue(row.field, row.before),
+          historyValue(row.field, row.after),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+      return matchesFilter && matchesSearch;
+    });
+  }, [globalHistory, historyFilter, historySearch]);
 
   function clearPhotoPreview() {
     if (photoPreview.startsWith("blob:")) URL.revokeObjectURL(photoPreview);
@@ -481,6 +613,7 @@ export function DriveDashboard() {
       }
 
       await loadDrives();
+      if (globalHistoryLoaded) await loadGlobalHistory();
       closeModal();
       setToast(editingId ? "Drive updated · history saved" : "Drive added");
     } catch (saveError) {
@@ -509,6 +642,7 @@ export function DriveDashboard() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Could not remove drive.");
       await loadDrives();
+      if (globalHistoryLoaded) await loadGlobalHistory();
       closeModal();
       setToast("Drive removed from inventory");
     } catch (deleteError) {
@@ -527,10 +661,7 @@ export function DriveDashboard() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true" />
-          <div className="brand-copy">
-            <span className="brand-name">Drive Ledger</span>
-            <span className="brand-subtitle">Production storage register</span>
-          </div>
+          <span className="brand-name">4DV Studio</span>
         </div>
         <div className="sync-status">
           <span className="sync-dot" aria-hidden="true" />
@@ -539,29 +670,35 @@ export function DriveDashboard() {
       </header>
 
       <main className="main">
-        <section className="hero">
+        <section className="page-heading">
           <div>
-            <p className="eyebrow">Burberry Rain · Media Operations</p>
-            <h1>
-              Know what’s on <em>every drive.</em>
-            </h1>
+            <h1>Hard Drive Tracking System</h1>
+            <p>Drive inventory, storage availability, and change history.</p>
           </div>
-          <div className="hero-side">
-            <p>
-              Track every drive from intake to processed—with an automatic
-              timeline of what changed, when it changed, and what was stored
-              before.
-            </p>
-            <div className="hero-actions">
-              <button className="button button-primary" onClick={openNew}>
-                <span aria-hidden="true">＋</span> Add hard drive
-              </button>
-              <a className="button button-ghost" href="#fit-checker">
-                Check a file <span aria-hidden="true">↓</span>
-              </a>
-            </div>
-          </div>
+          <button className="button button-primary" onClick={openNew}>
+            <span aria-hidden="true">＋</span> Add hard drive
+          </button>
         </section>
+
+        <nav className="page-tabs" aria-label="Hard drive tracking views">
+          <button
+            className="page-tab"
+            aria-current={activePageTab === "inventory" ? "page" : undefined}
+            onClick={() => setActivePageTab("inventory")}
+          >
+            Inventory <span>{drives.length}</span>
+          </button>
+          <button
+            className="page-tab"
+            aria-current={activePageTab === "history" ? "page" : undefined}
+            onClick={() => setActivePageTab("history")}
+          >
+            History
+          </button>
+        </nav>
+
+        {activePageTab === "inventory" ? (
+          <div className="page-panel">
 
         <section className="stats-grid" aria-label="Storage overview">
           <article className="stat-card">
@@ -781,6 +918,111 @@ export function DriveDashboard() {
             )}
           </div>
         </section>
+          </div>
+        ) : (
+          <section className="global-history">
+            <div className="section-head history-section-head">
+              <div>
+                <h2 className="section-title">Drive history</h2>
+                <p className="section-kicker">
+                  Important changes across every hard drive · {globalHistoryRows.length} events shown
+                </p>
+              </div>
+              <button
+                className="button button-ghost"
+                onClick={() => void loadGlobalHistory()}
+                disabled={globalHistoryLoading}
+              >
+                {globalHistoryLoading ? "Refreshing…" : "Refresh history"}
+              </button>
+            </div>
+
+            <div className="history-toolbar">
+              <label className="search-box">
+                <input
+                  value={historySearch}
+                  onChange={(event) => setHistorySearch(event.target.value)}
+                  placeholder="Search drive number, event or value…"
+                  aria-label="Search drive history"
+                />
+              </label>
+              <label className="history-filter-wrap">
+                <span>Event</span>
+                <select
+                  value={historyFilter}
+                  onChange={(event) => setHistoryFilter(event.target.value as HistoryFilter)}
+                  aria-label="Filter history by event"
+                >
+                  {historyFilters.map((item) => (
+                    <option value={item.value} key={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {error ? (
+              <div className="error-banner" role="alert">
+                <span>{error}</span>
+                <button className="button button-small" onClick={() => void loadGlobalHistory()}>
+                  Try again
+                </button>
+              </div>
+            ) : null}
+
+            <div className="table-wrap history-table-wrap">
+              {globalHistoryLoading && !globalHistoryLoaded ? (
+                <div className="loading-state">Loading drive history…</div>
+              ) : globalHistoryRows.length === 0 ? (
+                <div className="empty-state">No important changes match this view.</div>
+              ) : (
+                <table className="global-history-table">
+                  <thead>
+                    <tr>
+                      <th>Date &amp; time</th>
+                      <th>Hard drive</th>
+                      <th>Event</th>
+                      <th>Previous</th>
+                      <th>New</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {globalHistoryRows.map((row) => {
+                      const drive = drives.find((item) => item.id === row.driveId);
+                      return (
+                        <tr key={row.id}>
+                          <td><time>{toDate(row.createdAt, true)}</time></td>
+                          <td>
+                            <button
+                              className="history-drive-link"
+                              onClick={() => drive && openEdit(drive)}
+                              disabled={!drive}
+                            >
+                              <strong>{row.driveNumber}</strong>
+                              <span>{row.driveLabel || "Unlabeled drive"}</span>
+                            </button>
+                          </td>
+                          <td>
+                            <span className={`event-chip event-${historyFieldGroups[row.field] || "record"}`}>
+                              {row.label}
+                            </span>
+                          </td>
+                          <td className="history-old-value">
+                            {row.before === null ? "—" : historyValue(row.field, row.before)}
+                          </td>
+                          <td className="history-new-value">{historyValue(row.field, row.after)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <p className="history-note">
+              This view keeps the signal clear by showing status, location, contents,
+              capacity, brand, and photo changes. Full details remain available inside each drive record.
+            </p>
+          </section>
+        )}
       </main>
 
       {modalOpen ? (
