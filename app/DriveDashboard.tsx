@@ -220,6 +220,10 @@ function formatStorage(gb: number) {
   return `${Math.round(gb)} GB`;
 }
 
+function formatGigabytes(gb: number) {
+  return `${Math.round(gb).toLocaleString("en-US")} GB`;
+}
+
 function capacityInputValue(gb: number, unit: CapacityUnit) {
   return unit === "TB" ? Number((gb / 1000).toFixed(3)) : gb;
 }
@@ -337,7 +341,7 @@ function Capacity({ drive }: { drive: Drive }) {
   return (
     <div>
       <div className="capacity-line">
-        <strong>{formatStorage(drive.spaceLeftGb)}</strong>
+        <strong>{formatGigabytes(drive.spaceLeftGb)}</strong>
         <span>of {formatStorage(drive.totalGb)}</span>
       </div>
       <div className="progress-track" aria-label={`${Math.round(used)}% used`}>
@@ -369,9 +373,10 @@ function historyValue(field: string, value: string | number | null) {
         ? "Data Center"
         : "Other";
   }
-  if (field === "totalGb" || field === "spaceLeftGb") {
+  if (field === "totalGb") {
     return formatStorage(Number(value));
   }
+  if (field === "spaceLeftGb") return formatGigabytes(Number(value));
   if (field === "deletePermission") {
     return deleteLabels[value as DeletePermission] || String(value);
   }
@@ -728,7 +733,7 @@ export function DriveDashboard() {
   }
 
   function updateSpaceLeft(value: number) {
-    updateField("spaceLeftGb", capacityInputToGb(value, capacityUnit));
+    updateField("spaceLeftGb", Math.round(value));
   }
 
   function toggleSort(nextSortKey: SortKey) {
@@ -1000,7 +1005,7 @@ export function DriveDashboard() {
             <div className="stat-label">
               Space left <span className="stat-index">02</span>
             </div>
-            <div className="stat-value">{formatStorage(stats.free)}</div>
+            <div className="stat-value">{formatGigabytes(stats.free)}</div>
             <div className="stat-caption">{stats.usedPercent}% used overall</div>
           </article>
           <article className="stat-card">
@@ -1050,7 +1055,7 @@ export function DriveDashboard() {
                 >
                   <strong>{drive.driveNumber}</strong>
                   <span>
-                    {formatStorage(drive.spaceLeftGb)} free · {deleteLabels[drive.deletePermission]}
+                    {formatGigabytes(drive.spaceLeftGb)} free · {deleteLabels[drive.deletePermission]}
                   </span>
                 </button>
               ))
@@ -1576,15 +1581,15 @@ export function DriveDashboard() {
                     <p className="field-hint">Choose TB or GB · 1 TB = 1,000 GB</p>
                   </div>
                   <div className="field">
-                    <label htmlFor="space-left">Space left ({capacityUnit})</label>
+                    <label htmlFor="space-left">Space left (GB)</label>
                     <input
                       id="space-left"
                       type="number"
                       min="0"
-                      max={capacityInputValue(form.totalGb, capacityUnit)}
-                      step={capacityUnit === "TB" ? 0.001 : 1}
+                      max={form.totalGb}
+                      step="1"
                       required
-                      value={capacityInputValue(form.spaceLeftGb, capacityUnit)}
+                      value={form.spaceLeftGb}
                       onChange={(event) => updateSpaceLeft(Number(event.target.value))}
                     />
                   </div>
