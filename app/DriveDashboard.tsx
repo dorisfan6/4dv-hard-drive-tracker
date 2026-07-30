@@ -306,6 +306,23 @@ function DeletePill({ permission }: { permission: DeletePermission }) {
   );
 }
 
+function fitAvailability(drive: Drive) {
+  if (drive.status === "processing") {
+    return {
+      label: `Processing · ${deleteLabels[drive.deletePermission]}`,
+      tone: "blocked",
+      rank: 3,
+    };
+  }
+  if (drive.deletePermission === "protected") {
+    return { label: "Protected", tone: "blocked", rank: 2 };
+  }
+  if (drive.deletePermission === "ask") {
+    return { label: "Ask first", tone: "caution", rank: 1 };
+  }
+  return { label: "Available", tone: "available", rank: 0 };
+}
+
 function SortableHeader({
   label,
   sortKey,
@@ -405,7 +422,9 @@ export function DriveDashboard() {
   const [deleteFilter, setDeleteFilter] = useState<DeleteFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("driveNumber");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [fitSize, setFitSize] = useState(500);
+  const [fitSize, setFitSize] = useState("");
+  const [searchedFitSize, setSearchedFitSize] = useState<number | null>(null);
+  const [fitError, setFitError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<ModalTab>("details");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -550,16 +569,16 @@ export function DriveDashboard() {
   }, [drives]);
 
   const fitCandidates = useMemo(
-    () =>
-      drives
-        .filter(
-          (drive) =>
-            drive.status !== "processing" &&
-            drive.deletePermission !== "protected" &&
-            drive.spaceLeftGb >= Math.max(0, fitSize || 0),
-        )
-        .sort((a, b) => b.spaceLeftGb - a.spaceLeftGb),
-    [drives, fitSize],
+    () => {
+      if (searchedFitSize === null) return [];
+      return drives
+        .filter((drive) => drive.spaceLeftGb >= searchedFitSize)
+        .sort((a, b) => {
+          const rankDifference = fitAvailability(a).rank - fitAvailability(b).rank;
+          return rankDifference || a.spaceLeftGb - b.spaceLeftGb;
+        });
+    },
+    [drives, searchedFitSize],
   );
 
   const filteredDrives = useMemo(() => {
@@ -747,6 +766,18 @@ export function DriveDashboard() {
         ? "desc"
         : "asc",
     );
+  }
+
+  function searchForFit(event: FormEvent) {
+    event.preventDefault();
+    const nextSize = Number(fitSize);
+    if (!Number.isFinite(nextSize) || nextSize <= 0) {
+      setFitError("Enter a file size greater than 0 GB.");
+      setSearchedFitSize(null);
+      return;
+    }
+    setFitError("");
+    setSearchedFitSize(Math.round(nextSize));
   }
 
   function updateBulkField<K extends keyof BulkForm>(
@@ -1026,41 +1057,71 @@ export function DriveDashboard() {
 
         <section className="fit-panel" id="fit-checker">
           <div>
+            <p className="fit-kicker">Capacity search</p>
             <h2 className="fit-title">Will the new file fit?</h2>
             <p className="fit-copy">
-              Enter its size and see non-processing drives with enough room.
+              Enter the file size, then search every drive with enough room.
             </p>
           </div>
-          <label className="fit-input-wrap">
-            <input
-              className="fit-input"
-              type="number"
-              min="0"
-              value={fitSize}
-              onChange={(event) => setFitSize(Number(event.target.value))}
-              aria-label="New file size in gigabytes"
-            />
-            <span className="fit-unit">GB</span>
-          </label>
+          <form className="fit-search-form" onSubmit={searchForFit}>
+            <label className="fit-input-wrap">
+              <input
+                className="fit-input"
+                type="number"
+                min="1"
+                step="1"
+                value={fitSize}
+                onChange={(event) => {
+                  setFitSize(event.target.value);
+                  setFitError("");
+                  setSearchedFitSize(null);
+                }}
+                placeholder="e.g. 500"
+                aria-label="New file size in gigabytes"
+              />
+              <span className="fit-unit">GB</span>
+            </label>
+            <button className="button button-primary fit-search-button" type="submit">
+              Search
+            </button>
+            {fitError ? <p className="fit-error" role="alert">{fitError}</p> : null}
+          </form>
           <div className="fit-result" aria-live="polite">
-            <span className="fit-result-label">
-              Available options · {fitCandidates.length}
-            </span>
-            {fitCandidates.length ? (
-              fitCandidates.map((drive) => (
-                <button
-                  className="fit-drive"
-                  key={drive.id}
-                  onClick={() => openEdit(drive)}
-                >
-                  <strong>{drive.driveNumber}</strong>
-                  <span>
-                    {formatGigabytes(drive.spaceLeftGb)} free · {deleteLabels[drive.deletePermission]}
+            {searchedFitSize === null ? (
+              <span className="fit-empty">Enter a size and select Search to see options.</span>
+            ) : fitCandidates.length ? (
+              <>
+                <div className="fit-result-head">
+                  <span className="fit-result-label">
+                    {fitCandidates.length} option{fitCandidates.length === 1 ? "" : "s"} for {formatGigabytes(searchedFitSize)}
                   </span>
-                </button>
-              ))
+                  <span>All drives with enough physical space are shown.</span>
+                </div>
+                <div className="fit-options">
+                  {fitCandidates.map((drive) => {
+                    const availability = fitAvailability(drive);
+                    return (
+                      <button
+                        className={`fit-drive fit-drive-${availability.tone}`}
+                        key={drive.id}
+                        onClick={() => openEdit(drive)}
+                      >
+                        <span className="fit-drive-topline">
+                          <strong>{drive.driveNumber}</strong>
+                          <span className={`fit-availability fit-availability-${availability.tone}`}>
+                            {availability.label}
+                          </span>
+                        </span>
+                        <span>{formatGigabytes(drive.spaceLeftGb)} free</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             ) : (
-              <span className="fit-empty">No available drive has enough room.</span>
+              <span className="fit-empty">
+                No drive has enough physical space for {formatGigabytes(searchedFitSize)}.
+              </span>
             )}
           </div>
         </section>

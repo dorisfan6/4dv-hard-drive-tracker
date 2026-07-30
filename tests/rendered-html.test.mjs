@@ -24,7 +24,12 @@ test("build contains the finished 4DV Studio hard drive tracker", async () => {
   assert.match(dashboard, /Edit selected drives/);
   assert.match(dashboard, /SortableHeader/);
   assert.match(dashboard, /Filter drives by delete permission/);
-  assert.match(dashboard, /Available options/);
+  assert.match(dashboard, /searchForFit/);
+  assert.match(dashboard, /Enter a size and select Search/);
+  assert.match(dashboard, /All drives with enough physical space are shown/);
+  assert.match(dashboard, /fitAvailability/);
+  assert.doesNotMatch(dashboard, /drive\.status !== "processing"/);
+  assert.doesNotMatch(dashboard, /drive\.deletePermission !== "protected"/);
   assert.doesNotMatch(dashboard, /fitCandidates\.slice/);
   assert.match(dashboard, /Choose TB or GB/);
   assert.match(dashboard, /Space left \(GB\)/);
