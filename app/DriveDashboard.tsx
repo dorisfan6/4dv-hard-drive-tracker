@@ -7,6 +7,17 @@ type DeletePermission = "clear" | "ask" | "protected";
 type Brand = "samsung" | "sandisk" | "other";
 type LocationType = "4dv-studio" | "data-center" | "other";
 type Filter = "all" | DriveStatus;
+type DeleteFilter = "all" | DeletePermission;
+type SortKey =
+  | "driveNumber"
+  | "status"
+  | "contents"
+  | "spaceLeftGb"
+  | "deletePermission"
+  | "location"
+  | "updatedAt";
+type SortDirection = "asc" | "desc";
+type CapacityUnit = "GB" | "TB";
 type ModalTab = "details" | "history";
 type PageTab = "inventory" | "history";
 type HistoryFilter =
@@ -153,6 +164,30 @@ const filters: Array<{ value: Filter; label: string }> = [
   { value: "processed", label: "Processed" },
 ];
 
+const deleteFilters: Array<{ value: DeleteFilter; label: string }> = [
+  { value: "all", label: "Can delete: All" },
+  { value: "clear", label: "Can delete: Clear" },
+  { value: "ask", label: "Can delete: Ask first" },
+  { value: "protected", label: "Can delete: Protected" },
+];
+
+const statusSortOrder: Record<DriveStatus, number> = {
+  waiting: 0,
+  processing: 1,
+  processed: 2,
+};
+
+const deleteSortOrder: Record<DeletePermission, number> = {
+  clear: 0,
+  ask: 1,
+  protected: 2,
+};
+
+const driveCollator = new Intl.Collator("en", {
+  numeric: true,
+  sensitivity: "base",
+});
+
 const historyFilters: Array<{ value: HistoryFilter; label: string }> = [
   { value: "all", label: "All activity" },
   { value: "status", label: "Status" },
@@ -183,6 +218,14 @@ function formatStorage(gb: number) {
     return `${Number.isInteger(tb) ? tb.toFixed(0) : tb.toFixed(1)} TB`;
   }
   return `${Math.round(gb)} GB`;
+}
+
+function capacityInputValue(gb: number, unit: CapacityUnit) {
+  return unit === "TB" ? Number((gb / 1000).toFixed(3)) : gb;
+}
+
+function capacityInputToGb(value: number, unit: CapacityUnit) {
+  return Math.round(unit === "TB" ? value * 1000 : value);
 }
 
 function toDate(value: string, withTime = false) {
@@ -259,6 +302,36 @@ function DeletePill({ permission }: { permission: DeletePermission }) {
   );
 }
 
+function SortableHeader({
+  label,
+  sortKey,
+  activeSortKey,
+  direction,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeSortKey: SortKey;
+  direction: SortDirection;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sortKey === activeSortKey;
+  return (
+    <th aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        className={`sort-button ${active ? "sort-button-active" : ""}`}
+        type="button"
+        onClick={() => onSort(sortKey)}
+      >
+        <span>{label}</span>
+        <span className="sort-indicator" aria-hidden="true">
+          {active ? (direction === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 function Capacity({ drive }: { drive: Drive }) {
   const used = capacityPercent(drive);
   return (
@@ -324,11 +397,15 @@ export function DriveDashboard() {
   const [formError, setFormError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [deleteFilter, setDeleteFilter] = useState<DeleteFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("driveNumber");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [fitSize, setFitSize] = useState(500);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<ModalTab>("details");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<DriveForm>(blankForm);
+  const [capacityUnit, setCapacityUnit] = useState<CapacityUnit>("TB");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -482,7 +559,7 @@ export function DriveDashboard() {
 
   const filteredDrives = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return drives.filter((drive) => {
+    const filtered = drives.filter((drive) => {
       const matchesSearch =
         !query ||
         [
@@ -497,9 +574,39 @@ export function DriveDashboard() {
           .toLowerCase()
           .includes(query);
       const matchesFilter = filter === "all" || drive.status === filter;
-      return matchesSearch && matchesFilter;
+      const matchesDeleteFilter =
+        deleteFilter === "all" || drive.deletePermission === deleteFilter;
+      return matchesSearch && matchesFilter && matchesDeleteFilter;
     });
-  }, [drives, filter, search]);
+
+    return [...filtered].sort((a, b) => {
+      let comparison = 0;
+      if (sortKey === "driveNumber") {
+        comparison = driveCollator.compare(
+          `${a.driveNumber} ${brandLabel(a)}`,
+          `${b.driveNumber} ${brandLabel(b)}`,
+        );
+      } else if (sortKey === "status") {
+        comparison = statusSortOrder[a.status] - statusSortOrder[b.status];
+      } else if (sortKey === "contents") {
+        comparison = driveCollator.compare(a.contents || a.note, b.contents || b.note);
+      } else if (sortKey === "spaceLeftGb") {
+        comparison = a.spaceLeftGb - b.spaceLeftGb;
+      } else if (sortKey === "deletePermission") {
+        comparison =
+          deleteSortOrder[a.deletePermission] - deleteSortOrder[b.deletePermission];
+      } else if (sortKey === "location") {
+        comparison = driveCollator.compare(a.location, b.location);
+      } else if (sortKey === "updatedAt") {
+        comparison = a.updatedAt.localeCompare(b.updatedAt);
+      }
+
+      if (comparison === 0) {
+        comparison = driveCollator.compare(a.driveNumber, b.driveNumber);
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [deleteFilter, drives, filter, search, sortDirection, sortKey]);
 
   const allVisibleSelected =
     filteredDrives.length > 0 &&
@@ -573,6 +680,7 @@ export function DriveDashboard() {
     setHistory([]);
     setFormError("");
     setForm({ ...blankForm, date: new Date().toISOString().slice(0, 10) });
+    setCapacityUnit("TB");
     setModalOpen(true);
   }
 
@@ -583,6 +691,7 @@ export function DriveDashboard() {
     setHistory([]);
     setFormError("");
     setPhotoPreview(drive.photoUrl);
+    setCapacityUnit(drive.totalGb >= 1000 ? "TB" : "GB");
     setForm({
       driveNumber: drive.driveNumber,
       label: drive.label,
@@ -607,6 +716,32 @@ export function DriveDashboard() {
     value: DriveForm[K],
   ) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateTotalCapacity(value: number) {
+    const totalGb = capacityInputToGb(value, capacityUnit);
+    setForm((current) => ({
+      ...current,
+      totalGb,
+      spaceLeftGb: Math.min(current.spaceLeftGb, totalGb),
+    }));
+  }
+
+  function updateSpaceLeft(value: number) {
+    updateField("spaceLeftGb", capacityInputToGb(value, capacityUnit));
+  }
+
+  function toggleSort(nextSortKey: SortKey) {
+    if (sortKey === nextSortKey) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(nextSortKey);
+    setSortDirection(
+      nextSortKey === "spaceLeftGb" || nextSortKey === "updatedAt"
+        ? "desc"
+        : "asc",
+    );
   }
 
   function updateBulkField<K extends keyof BulkForm>(
@@ -903,16 +1038,20 @@ export function DriveDashboard() {
             <span className="fit-unit">GB</span>
           </label>
           <div className="fit-result" aria-live="polite">
-            <span className="fit-result-label">Best options</span>
+            <span className="fit-result-label">
+              Available options · {fitCandidates.length}
+            </span>
             {fitCandidates.length ? (
-              fitCandidates.slice(0, 3).map((drive) => (
+              fitCandidates.map((drive) => (
                 <button
                   className="fit-drive"
                   key={drive.id}
                   onClick={() => openEdit(drive)}
                 >
                   <strong>{drive.driveNumber}</strong>
-                  <span>{formatStorage(drive.spaceLeftGb)} free</span>
+                  <span>
+                    {formatStorage(drive.spaceLeftGb)} free · {deleteLabels[drive.deletePermission]}
+                  </span>
                 </button>
               ))
             ) : (
@@ -952,17 +1091,29 @@ export function DriveDashboard() {
                 aria-label="Search drive inventory"
               />
             </label>
-            <div className="filter-tabs" aria-label="Filter drives">
-              {filters.map((item) => (
-                <button
-                  className="filter-tab"
-                  aria-pressed={filter === item.value}
-                  key={item.value}
-                  onClick={() => setFilter(item.value)}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="toolbar-filters">
+              <div className="filter-tabs" aria-label="Filter drives by status">
+                {filters.map((item) => (
+                  <button
+                    className="filter-tab"
+                    aria-pressed={filter === item.value}
+                    key={item.value}
+                    onClick={() => setFilter(item.value)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <select
+                className="permission-filter"
+                value={deleteFilter}
+                onChange={(event) => setDeleteFilter(event.target.value as DeleteFilter)}
+                aria-label="Filter drives by delete permission"
+              >
+                {deleteFilters.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -1031,13 +1182,13 @@ export function DriveDashboard() {
                           onChange={toggleAllVisible}
                         />
                       </th>
-                      <th>Hard drive # / brand</th>
-                      <th>Status</th>
-                      <th>Contents / 里面有什么</th>
-                      <th>Space left</th>
-                      <th>Can delete?</th>
-                      <th>Location</th>
-                      <th>Updated</th>
+                      <SortableHeader label="Hard drive # / brand" sortKey="driveNumber" activeSortKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                      <SortableHeader label="Status" sortKey="status" activeSortKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                      <SortableHeader label="Contents / 里面有什么" sortKey="contents" activeSortKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                      <SortableHeader label="Space left" sortKey="spaceLeftGb" activeSortKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                      <SortableHeader label="Can delete?" sortKey="deletePermission" activeSortKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                      <SortableHeader label="Location" sortKey="location" activeSortKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                      <SortableHeader label="Updated" sortKey="updatedAt" activeSortKey={sortKey} direction={sortDirection} onSort={toggleSort} />
                       <th aria-label="Actions" />
                     </tr>
                   </thead>
@@ -1402,27 +1553,39 @@ export function DriveDashboard() {
                     </div>
                   ) : null}
                   <div className="field">
-                    <label htmlFor="total-space">Total storage (GB)</label>
-                    <input
-                      id="total-space"
-                      type="number"
-                      min="1"
-                      required
-                      value={form.totalGb}
-                      onChange={(event) => updateField("totalGb", Number(event.target.value))}
-                    />
-                    <p className="field-hint">1 TB = 1,000 GB</p>
+                    <label htmlFor="total-space">Total storage</label>
+                    <div className="capacity-input-group">
+                      <input
+                        id="total-space"
+                        type="number"
+                        min={capacityUnit === "TB" ? 0.001 : 1}
+                        step={capacityUnit === "TB" ? 0.001 : 1}
+                        required
+                        value={capacityInputValue(form.totalGb, capacityUnit)}
+                        onChange={(event) => updateTotalCapacity(Number(event.target.value))}
+                      />
+                      <select
+                        value={capacityUnit}
+                        onChange={(event) => setCapacityUnit(event.target.value as CapacityUnit)}
+                        aria-label="Capacity unit"
+                      >
+                        <option value="TB">TB</option>
+                        <option value="GB">GB</option>
+                      </select>
+                    </div>
+                    <p className="field-hint">Choose TB or GB · 1 TB = 1,000 GB</p>
                   </div>
                   <div className="field">
-                    <label htmlFor="space-left">Space left (GB)</label>
+                    <label htmlFor="space-left">Space left ({capacityUnit})</label>
                     <input
                       id="space-left"
                       type="number"
                       min="0"
-                      max={form.totalGb}
+                      max={capacityInputValue(form.totalGb, capacityUnit)}
+                      step={capacityUnit === "TB" ? 0.001 : 1}
                       required
-                      value={form.spaceLeftGb}
-                      onChange={(event) => updateField("spaceLeftGb", Number(event.target.value))}
+                      value={capacityInputValue(form.spaceLeftGb, capacityUnit)}
+                      onChange={(event) => updateSpaceLeft(Number(event.target.value))}
                     />
                   </div>
                   <div className="field field-full">
