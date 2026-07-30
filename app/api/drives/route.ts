@@ -11,6 +11,8 @@ import {
 
 type DrivePayload = {
   id?: number;
+  ids?: number[];
+  updates?: BulkDriveUpdates;
   driveNumber?: string;
   label?: string;
   date?: string;
@@ -26,6 +28,15 @@ type DrivePayload = {
   note?: string;
 };
 
+type BulkDriveUpdates = {
+  status?: string;
+  deletePermission?: string;
+  brand?: string;
+  customBrand?: string;
+  locationType?: string;
+  location?: string;
+};
+
 const validStatuses = new Set(["waiting", "processing", "processed"]);
 const validPermissions = new Set(["clear", "ask", "protected"]);
 const validBrands = new Set(["samsung", "sandisk", "other"]);
@@ -38,7 +49,17 @@ const globalHistoryFields = new Set([
   "spaceLeftGb",
   "brand",
   "customBrand",
+  "deletePermission",
   "photoName",
+]);
+
+const bulkUpdateFields = new Set([
+  "status",
+  "deletePermission",
+  "brand",
+  "customBrand",
+  "locationType",
+  "location",
 ]);
 
 function cleanPayload(payload: DrivePayload) {
@@ -94,6 +115,49 @@ function cleanPayload(payload: DrivePayload) {
     location,
     note,
   };
+}
+
+async function updateDriveRecord(
+  d1: D1Database,
+  id: number,
+  drive: ReturnType<typeof cleanPayload>,
+) {
+  await d1
+    .prepare(`
+      UPDATE drives SET
+        drive_number = ?,
+        label = ?,
+        date = ?,
+        status = ?,
+        total_gb = ?,
+        space_left_gb = ?,
+        contents = ?,
+        delete_permission = ?,
+        brand = ?,
+        custom_brand = ?,
+        location_type = ?,
+        location = ?,
+        note = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `)
+    .bind(
+      drive.driveNumber,
+      drive.label,
+      drive.date,
+      drive.status,
+      drive.totalGb,
+      drive.spaceLeftGb,
+      drive.contents,
+      drive.deletePermission,
+      drive.brand,
+      drive.customBrand,
+      drive.locationType,
+      drive.location,
+      drive.note,
+      id,
+    )
+    .run();
 }
 
 function errorResponse(error: unknown) {
@@ -255,6 +319,73 @@ export async function PATCH(request: Request) {
   try {
     const d1 = await ensureDriveDatabase();
     const payload = (await request.json()) as DrivePayload;
+
+    if (Array.isArray(payload.ids)) {
+      const ids = [...new Set(payload.ids.map(Number))];
+      const updates = payload.updates ?? {};
+      const updateKeys = Object.keys(updates);
+      if (
+        !ids.length ||
+        ids.length > 100 ||
+        ids.some((id) => !Number.isInteger(id) || id <= 0)
+      ) {
+        return Response.json(
+          { error: "Select between 1 and 100 valid drives." },
+          { status: 400 },
+        );
+      }
+      if (
+        !updateKeys.length ||
+        updateKeys.some((key) => !bulkUpdateFields.has(key))
+      ) {
+        return Response.json(
+          { error: "Choose at least one supported field to update." },
+          { status: 400 },
+        );
+      }
+
+      const prepared: Array<{
+        id: number;
+        before: DriveRecord;
+        drive: ReturnType<typeof cleanPayload>;
+      }> = [];
+      for (const id of ids) {
+        const before = await getDriveById(d1, id);
+        if (!before) {
+          return Response.json(
+            { error: `Drive ${id} was not found.` },
+            { status: 404 },
+          );
+        }
+        prepared.push({
+          id,
+          before,
+          drive: cleanPayload({ ...before, ...updates }),
+        });
+      }
+
+      let changedCount = 0;
+      for (const item of prepared) {
+        await updateDriveRecord(d1, item.id, item.drive);
+        const after = await getDriveById(d1, item.id);
+        if (!after) throw new Error("Could not load a bulk-updated drive.");
+        const changes = buildChanges(item.before, after);
+        if (changes.length) {
+          changedCount += 1;
+          await recordHistory(
+            d1,
+            item.id,
+            "bulk-updated",
+            summarizeChanges(changes),
+            item.before,
+            after,
+            changes,
+          );
+        }
+      }
+      return Response.json({ ok: true, changedCount });
+    }
+
     const id = Number(payload.id);
     if (!Number.isInteger(id) || id <= 0) {
       return Response.json({ error: "A valid drive id is required." }, { status: 400 });
@@ -262,42 +393,7 @@ export async function PATCH(request: Request) {
     const before = await getDriveById(d1, id);
     if (!before) return Response.json({ error: "Drive not found." }, { status: 404 });
     const drive = cleanPayload(payload);
-    await d1
-      .prepare(`
-        UPDATE drives SET
-          drive_number = ?,
-          label = ?,
-          date = ?,
-          status = ?,
-          total_gb = ?,
-          space_left_gb = ?,
-          contents = ?,
-          delete_permission = ?,
-          brand = ?,
-          custom_brand = ?,
-          location_type = ?,
-          location = ?,
-          note = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `)
-      .bind(
-        drive.driveNumber,
-        drive.label,
-        drive.date,
-        drive.status,
-        drive.totalGb,
-        drive.spaceLeftGb,
-        drive.contents,
-        drive.deletePermission,
-        drive.brand,
-        drive.customBrand,
-        drive.locationType,
-        drive.location,
-        drive.note,
-        id,
-      )
-      .run();
+    await updateDriveRecord(d1, id, drive);
     const after = await getDriveById(d1, id);
     if (!after) throw new Error("Could not load the updated drive.");
     const changes = buildChanges(before, after);

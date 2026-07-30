@@ -9,7 +9,15 @@ type LocationType = "4dv-studio" | "data-center" | "other";
 type Filter = "all" | DriveStatus;
 type ModalTab = "details" | "history";
 type PageTab = "inventory" | "history";
-type HistoryFilter = "all" | "status" | "location" | "contents" | "capacity" | "brand" | "photo";
+type HistoryFilter =
+  | "all"
+  | "status"
+  | "location"
+  | "contents"
+  | "capacity"
+  | "permission"
+  | "brand"
+  | "photo";
 
 type Drive = {
   id: number;
@@ -47,6 +55,19 @@ type DriveForm = {
   locationType: LocationType;
   location: string;
   note: string;
+};
+
+type BulkForm = {
+  changeStatus: boolean;
+  status: DriveStatus;
+  changeLocation: boolean;
+  locationType: LocationType;
+  location: string;
+  changePermission: boolean;
+  deletePermission: DeletePermission;
+  changeBrand: boolean;
+  brand: Brand;
+  customBrand: string;
 };
 
 type HistoryChange = {
@@ -100,6 +121,19 @@ const blankForm: DriveForm = {
   note: "",
 };
 
+const blankBulkForm: BulkForm = {
+  changeStatus: false,
+  status: "waiting",
+  changeLocation: false,
+  locationType: "4dv-studio",
+  location: "4DV Studio",
+  changePermission: false,
+  deletePermission: "ask",
+  changeBrand: false,
+  brand: "samsung",
+  customBrand: "",
+};
+
 const statusLabels: Record<DriveStatus, string> = {
   waiting: "Waiting to be processed",
   processing: "Processing",
@@ -125,6 +159,7 @@ const historyFilters: Array<{ value: HistoryFilter; label: string }> = [
   { value: "location", label: "Location" },
   { value: "contents", label: "Contents" },
   { value: "capacity", label: "Capacity" },
+  { value: "permission", label: "Delete permission" },
   { value: "brand", label: "Brand" },
   { value: "photo", label: "Photo" },
 ];
@@ -136,6 +171,7 @@ const historyFieldGroups: Record<string, Exclude<HistoryFilter, "all">> = {
   contents: "contents",
   totalGb: "capacity",
   spaceLeftGb: "capacity",
+  deletePermission: "permission",
   brand: "brand",
   customBrand: "brand",
   photoName: "photo",
@@ -302,6 +338,11 @@ export function DriveDashboard() {
   const [globalHistoryLoaded, setGlobalHistoryLoaded] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
+  const [selectedDriveIds, setSelectedDriveIds] = useState<number[]>([]);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkForm, setBulkForm] = useState<BulkForm>(blankBulkForm);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkError, setBulkError] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
 
@@ -388,13 +429,15 @@ export function DriveDashboard() {
   }, [activePageTab, globalHistoryLoaded]);
 
   useEffect(() => {
-    if (!modalOpen) return;
+    if (!modalOpen && !bulkModalOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setModalOpen(false);
+      if (event.key !== "Escape") return;
+      if (bulkModalOpen) setBulkModalOpen(false);
+      else setModalOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [modalOpen]);
+  }, [bulkModalOpen, modalOpen]);
 
   useEffect(() => {
     if (!toast) return;
@@ -457,6 +500,10 @@ export function DriveDashboard() {
       return matchesSearch && matchesFilter;
     });
   }, [drives, filter, search]);
+
+  const allVisibleSelected =
+    filteredDrives.length > 0 &&
+    filteredDrives.every((drive) => selectedDriveIds.includes(drive.id));
 
   const globalHistoryRows = useMemo<GlobalHistoryRow[]>(() => {
     const rows = globalHistory.flatMap((entry) => {
@@ -562,6 +609,104 @@ export function DriveDashboard() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function updateBulkField<K extends keyof BulkForm>(
+    key: K,
+    value: BulkForm[K],
+  ) {
+    setBulkForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleDriveSelection(driveId: number) {
+    setSelectedDriveIds((current) =>
+      current.includes(driveId)
+        ? current.filter((id) => id !== driveId)
+        : [...current, driveId],
+    );
+  }
+
+  function toggleAllVisible() {
+    const visibleIds = filteredDrives.map((drive) => drive.id);
+    setSelectedDriveIds((current) => {
+      if (allVisibleSelected) {
+        return current.filter((id) => !visibleIds.includes(id));
+      }
+      return [...new Set([...current, ...visibleIds])];
+    });
+  }
+
+  function openBulkEdit() {
+    if (!selectedDriveIds.length) return;
+    setBulkError("");
+    setBulkForm({ ...blankBulkForm });
+    setBulkModalOpen(true);
+  }
+
+  async function saveBulkChanges(event: FormEvent) {
+    event.preventDefault();
+    setBulkError("");
+    const updates: Record<string, string> = {};
+    if (bulkForm.changeStatus) updates.status = bulkForm.status;
+    if (bulkForm.changeLocation) {
+      if (bulkForm.locationType === "other" && !bulkForm.location.trim()) {
+        setBulkError("Enter the custom physical location.");
+        return;
+      }
+      updates.locationType = bulkForm.locationType;
+      updates.location =
+        bulkForm.locationType === "4dv-studio"
+          ? "4DV Studio"
+          : bulkForm.locationType === "data-center"
+            ? "Data Center"
+            : bulkForm.location.trim();
+    }
+    if (bulkForm.changePermission) {
+      updates.deletePermission = bulkForm.deletePermission;
+    }
+    if (bulkForm.changeBrand) {
+      if (bulkForm.brand === "other" && !bulkForm.customBrand.trim()) {
+        setBulkError("Enter the custom drive brand.");
+        return;
+      }
+      updates.brand = bulkForm.brand;
+      updates.customBrand =
+        bulkForm.brand === "other" ? bulkForm.customBrand.trim() : "";
+    }
+    if (!Object.keys(updates).length) {
+      setBulkError("Choose at least one field to change.");
+      return;
+    }
+
+    setBulkSaving(true);
+    try {
+      const response = await fetch("/api/drives", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedDriveIds, updates }),
+      });
+      const payload = (await response.json()) as {
+        changedCount?: number;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not update the selected drives.");
+      }
+      await loadDrives();
+      if (globalHistoryLoaded) await loadGlobalHistory();
+      setBulkModalOpen(false);
+      setSelectedDriveIds([]);
+      const count = payload.changedCount ?? 0;
+      setToast(`${count} drive${count === 1 ? "" : "s"} updated · history saved`);
+    } catch (bulkSaveError) {
+      setBulkError(
+        bulkSaveError instanceof Error
+          ? bulkSaveError.message
+          : "Could not update the selected drives.",
+      );
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   function choosePhoto(file: File | undefined) {
     if (!file) return;
     setFormError("");
@@ -614,6 +759,9 @@ export function DriveDashboard() {
 
       await loadDrives();
       if (globalHistoryLoaded) await loadGlobalHistory();
+      setSelectedDriveIds((current) =>
+        current.filter((id) => id !== editingId),
+      );
       closeModal();
       setToast(editingId ? "Drive updated · history saved" : "Drive added");
     } catch (saveError) {
@@ -643,6 +791,9 @@ export function DriveDashboard() {
       if (!response.ok) throw new Error(payload.error || "Could not remove drive.");
       await loadDrives();
       if (globalHistoryLoaded) await loadGlobalHistory();
+      setSelectedDriveIds((current) =>
+        current.filter((id) => id !== editingId),
+      );
       closeModal();
       setToast("Drive removed from inventory");
     } catch (deleteError) {
@@ -813,6 +964,40 @@ export function DriveDashboard() {
             </div>
           </div>
 
+          <div className={`bulk-bar ${selectedDriveIds.length ? "bulk-bar-active" : ""}`}>
+            <label className="bulk-select-all">
+              <input
+                className="selection-checkbox"
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={toggleAllVisible}
+                disabled={!filteredDrives.length}
+              />
+              <span>
+                {selectedDriveIds.length
+                  ? `${selectedDriveIds.length} drive${selectedDriveIds.length === 1 ? "" : "s"} selected`
+                  : "Select multiple drives"}
+              </span>
+            </label>
+            <div className="bulk-actions">
+              {selectedDriveIds.length ? (
+                <button
+                  className="bulk-clear"
+                  onClick={() => setSelectedDriveIds([])}
+                >
+                  Clear selection
+                </button>
+              ) : null}
+              <button
+                className="button button-primary button-small"
+                onClick={openBulkEdit}
+                disabled={!selectedDriveIds.length}
+              >
+                Edit selected
+              </button>
+            </div>
+          </div>
+
           <div className="table-wrap">
             {loading ? (
               <div className="loading-state">Loading the drive register…</div>
@@ -824,17 +1009,26 @@ export function DriveDashboard() {
               <>
                 <table className="drive-table">
                   <colgroup>
-                    <col style={{ width: "17%" }} />
-                    <col style={{ width: "14%" }} />
-                    <col style={{ width: "22%" }} />
+                    <col style={{ width: "4%" }} />
+                    <col style={{ width: "15%" }} />
                     <col style={{ width: "13%" }} />
+                    <col style={{ width: "20%" }} />
+                    <col style={{ width: "12%" }} />
                     <col style={{ width: "11%" }} />
                     <col style={{ width: "11%" }} />
-                    <col style={{ width: "8%" }} />
+                    <col style={{ width: "10%" }} />
                     <col style={{ width: "4%" }} />
                   </colgroup>
                   <thead>
                     <tr>
+                      <th aria-label="Select all visible drives">
+                        <input
+                          className="selection-checkbox"
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          onChange={toggleAllVisible}
+                        />
+                      </th>
                       <th>Hard drive # / brand</th>
                       <th>Status</th>
                       <th>Contents / 里面有什么</th>
@@ -847,7 +1041,19 @@ export function DriveDashboard() {
                   </thead>
                   <tbody>
                     {filteredDrives.map((drive) => (
-                      <tr key={drive.id}>
+                      <tr
+                        className={selectedDriveIds.includes(drive.id) ? "row-selected" : ""}
+                        key={drive.id}
+                      >
+                        <td>
+                          <input
+                            className="selection-checkbox"
+                            type="checkbox"
+                            checked={selectedDriveIds.includes(drive.id)}
+                            onChange={() => toggleDriveSelection(drive.id)}
+                            aria-label={`Select ${drive.driveNumber}`}
+                          />
+                        </td>
                         <td><DriveIdentity drive={drive} /></td>
                         <td><StatusPill status={drive.status} /></td>
                         <td>
@@ -876,9 +1082,21 @@ export function DriveDashboard() {
 
                 <div className="mobile-cards">
                   {filteredDrives.map((drive) => (
-                    <article className="mobile-card" key={drive.id}>
+                    <article
+                      className={`mobile-card ${selectedDriveIds.includes(drive.id) ? "mobile-card-selected" : ""}`}
+                      key={drive.id}
+                    >
                       <div className="mobile-top">
-                        <DriveIdentity drive={drive} />
+                        <div className="mobile-select-identity">
+                          <input
+                            className="selection-checkbox"
+                            type="checkbox"
+                            checked={selectedDriveIds.includes(drive.id)}
+                            onChange={() => toggleDriveSelection(drive.id)}
+                            aria-label={`Select ${drive.driveNumber}`}
+                          />
+                          <DriveIdentity drive={drive} />
+                        </div>
                         <button
                           className="row-action"
                           onClick={() => openEdit(drive)}
@@ -1313,6 +1531,180 @@ export function DriveDashboard() {
                 )}
               </section>
             )}
+          </aside>
+        </div>
+      ) : null}
+
+      {bulkModalOpen ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !bulkSaving) {
+              setBulkModalOpen(false);
+            }
+          }}
+        >
+          <aside
+            className="modal bulk-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-edit-title"
+          >
+            <div className="modal-head">
+              <div>
+                <p className="modal-kicker">{selectedDriveIds.length} selected drives</p>
+                <h2 className="modal-title" id="bulk-edit-title">Edit selected drives</h2>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setBulkModalOpen(false)}
+                aria-label="Close bulk editor"
+                disabled={bulkSaving}
+              >×</button>
+            </div>
+
+            <div className="bulk-drive-summary">
+              {drives
+                .filter((drive) => selectedDriveIds.includes(drive.id))
+                .map((drive) => (
+                  <span key={drive.id}>{drive.driveNumber}</span>
+                ))}
+            </div>
+
+            <p className="bulk-help">
+              Check only the fields you want to apply. Unchecked fields will stay unchanged.
+            </p>
+
+            {bulkError ? <div className="modal-error" role="alert">{bulkError}</div> : null}
+
+            <form className="bulk-form" onSubmit={saveBulkChanges}>
+              <section className={`bulk-option ${bulkForm.changeStatus ? "bulk-option-enabled" : ""}`}>
+                <label className="bulk-option-toggle">
+                  <input
+                    className="selection-checkbox"
+                    type="checkbox"
+                    checked={bulkForm.changeStatus}
+                    onChange={(event) => updateBulkField("changeStatus", event.target.checked)}
+                  />
+                  <span>Status</span>
+                </label>
+                <select
+                  value={bulkForm.status}
+                  onChange={(event) => updateBulkField("status", event.target.value as DriveStatus)}
+                  disabled={!bulkForm.changeStatus}
+                  aria-label="New status for selected drives"
+                >
+                  <option value="waiting">Waiting to be processed</option>
+                  <option value="processing">Processing</option>
+                  <option value="processed">Processed</option>
+                </select>
+              </section>
+
+              <section className={`bulk-option ${bulkForm.changeLocation ? "bulk-option-enabled" : ""}`}>
+                <label className="bulk-option-toggle">
+                  <input
+                    className="selection-checkbox"
+                    type="checkbox"
+                    checked={bulkForm.changeLocation}
+                    onChange={(event) => updateBulkField("changeLocation", event.target.checked)}
+                  />
+                  <span>Physical location</span>
+                </label>
+                <div className="bulk-option-controls">
+                  <select
+                    value={bulkForm.locationType}
+                    onChange={(event) => updateBulkField("locationType", event.target.value as LocationType)}
+                    disabled={!bulkForm.changeLocation}
+                    aria-label="New location for selected drives"
+                  >
+                    <option value="4dv-studio">4DV Studio</option>
+                    <option value="data-center">Data Center</option>
+                    <option value="other">Other</option>
+                  </select>
+                  {bulkForm.locationType === "other" ? (
+                    <input
+                      value={bulkForm.location}
+                      onChange={(event) => updateBulkField("location", event.target.value)}
+                      disabled={!bulkForm.changeLocation}
+                      placeholder="Enter physical location"
+                      aria-label="Custom location for selected drives"
+                    />
+                  ) : null}
+                </div>
+              </section>
+
+              <section className={`bulk-option ${bulkForm.changePermission ? "bulk-option-enabled" : ""}`}>
+                <label className="bulk-option-toggle">
+                  <input
+                    className="selection-checkbox"
+                    type="checkbox"
+                    checked={bulkForm.changePermission}
+                    onChange={(event) => updateBulkField("changePermission", event.target.checked)}
+                  />
+                  <span>Can delete?</span>
+                </label>
+                <select
+                  value={bulkForm.deletePermission}
+                  onChange={(event) => updateBulkField("deletePermission", event.target.value as DeletePermission)}
+                  disabled={!bulkForm.changePermission}
+                  aria-label="New delete permission for selected drives"
+                >
+                  <option value="clear">Clear — safe to delete</option>
+                  <option value="ask">Ask first</option>
+                  <option value="protected">Protected — do not delete</option>
+                </select>
+              </section>
+
+              <section className={`bulk-option ${bulkForm.changeBrand ? "bulk-option-enabled" : ""}`}>
+                <label className="bulk-option-toggle">
+                  <input
+                    className="selection-checkbox"
+                    type="checkbox"
+                    checked={bulkForm.changeBrand}
+                    onChange={(event) => updateBulkField("changeBrand", event.target.checked)}
+                  />
+                  <span>Brand</span>
+                </label>
+                <div className="bulk-option-controls">
+                  <select
+                    value={bulkForm.brand}
+                    onChange={(event) => updateBulkField("brand", event.target.value as Brand)}
+                    disabled={!bulkForm.changeBrand}
+                    aria-label="New brand for selected drives"
+                  >
+                    <option value="samsung">Samsung</option>
+                    <option value="sandisk">SanDisk</option>
+                    <option value="other">Other</option>
+                  </select>
+                  {bulkForm.brand === "other" ? (
+                    <input
+                      value={bulkForm.customBrand}
+                      onChange={(event) => updateBulkField("customBrand", event.target.value)}
+                      disabled={!bulkForm.changeBrand}
+                      placeholder="Enter drive brand"
+                      aria-label="Custom brand for selected drives"
+                    />
+                  ) : null}
+                </div>
+              </section>
+
+              <div className="modal-footer bulk-footer">
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => setBulkModalOpen(false)}
+                  disabled={bulkSaving}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="button button-primary" disabled={bulkSaving}>
+                  {bulkSaving
+                    ? "Updating…"
+                    : `Update ${selectedDriveIds.length} drive${selectedDriveIds.length === 1 ? "" : "s"}`}
+                </button>
+              </div>
+            </form>
           </aside>
         </div>
       ) : null}

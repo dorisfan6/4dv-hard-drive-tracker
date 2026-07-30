@@ -544,6 +544,70 @@ textarea:focus-visible {
   color: white;
 }
 
+.bulk-bar {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.bulk-bar-active {
+  border-color: #b9c8f2;
+  background: #f0f4ff;
+}
+
+.bulk-select-all,
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bulk-select-all {
+  color: #555d6d;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.selection-checkbox {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.selection-checkbox:disabled {
+  cursor: default;
+}
+
+.bulk-clear {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 630;
+  cursor: pointer;
+}
+
+.bulk-clear:hover {
+  color: var(--ink);
+}
+
+.button:disabled {
+  transform: none;
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .table-wrap {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -588,6 +652,11 @@ textarea:focus-visible {
 
 .drive-table tbody tr:hover {
   background: #f6f3ec;
+}
+
+.drive-table tbody tr.row-selected,
+.drive-table tbody tr.row-selected:hover {
+  background: #f0f4ff;
 }
 
 .drive-id {
@@ -957,6 +1026,11 @@ textarea:focus-visible {
   color: var(--yellow);
 }
 
+.event-permission {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
 .event-photo,
 .event-brand {
   background: var(--green-soft);
@@ -1084,6 +1158,96 @@ textarea:focus-visible {
   color: #75251b;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.bulk-modal {
+  width: min(590px, 100%);
+}
+
+.bulk-drive-summary {
+  display: flex;
+  max-height: 82px;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow-y: auto;
+  margin-top: 18px;
+}
+
+.bulk-drive-summary span {
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: #eef0f4;
+  color: #505767;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-weight: 670;
+}
+
+.bulk-help {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.bulk-form {
+  display: grid;
+  gap: 10px;
+  padding-top: 20px;
+}
+
+.bulk-option {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.65fr) minmax(230px, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f7f8fa;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.bulk-option-enabled {
+  border-color: #b9c8f2;
+  background: #f0f4ff;
+}
+
+.bulk-option-toggle {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.bulk-option select,
+.bulk-option input:not([type="checkbox"]) {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.bulk-option select:disabled,
+.bulk-option input:not([type="checkbox"]):disabled {
+  background: #eceef2;
+  color: #9298a4;
+}
+
+.bulk-option-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.bulk-footer {
+  justify-content: flex-end;
 }
 
 .photo-field {
@@ -1427,8 +1591,8 @@ textarea:focus-visible {
     grid-template-columns: 1.25fr 0.75fr;
   }
 
-  .drive-table th:nth-child(7),
-  .drive-table td:nth-child(7) {
+  .drive-table th:nth-child(8),
+  .drive-table td:nth-child(8) {
     display: none;
   }
 
@@ -1502,6 +1666,17 @@ textarea:focus-visible {
     align-items: start;
     justify-content: space-between;
     gap: 14px;
+  }
+
+  .mobile-select-identity {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .mobile-card-selected {
+    background: #f0f4ff;
   }
 
   .mobile-meta {
@@ -1624,12 +1799,31 @@ textarea:focus-visible {
     flex: 1 0 auto;
   }
 
+  .bulk-bar {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 13px;
+  }
+
+  .bulk-actions {
+    justify-content: space-between;
+  }
+
+  .bulk-actions .button {
+    flex: 1;
+  }
+
   .mobile-meta {
     grid-template-columns: 1fr 1fr;
   }
 
   .modal {
     padding: 22px 18px 28px;
+  }
+
+  .bulk-option {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .photo-field {

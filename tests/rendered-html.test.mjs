@@ -3,8 +3,9 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("build contains the finished 4DV Studio hard drive tracker", async () => {
-  const [dashboard, layout, hosting] = await Promise.all([
+  const [dashboard, driveApi, layout, hosting] = await Promise.all([
     readFile(new URL("../app/DriveDashboard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/drives/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../dist/.openai/hosting.json", import.meta.url), "utf8"),
     access(new URL("../dist/server/index.js", import.meta.url)),
@@ -17,8 +18,15 @@ test("build contains the finished 4DV Studio hard drive tracker", async () => {
   assert.match(dashboard, /Waiting to be processed/);
   assert.match(dashboard, /Drive history/);
   assert.match(dashboard, /\?history=all/);
+  assert.match(dashboard, /Select multiple drives/);
+  assert.match(dashboard, /Edit selected drives/);
+  assert.match(driveApi, /bulk-updated/);
+  assert.match(driveApi, /Select between 1 and 100 valid drives/);
   assert.match(layout, /4DV Studio — Hard Drive Tracking System/);
-  assert.doesNotMatch(dashboard, /Drive Ledger|Production storage register|Burberry Rain|Know what’s on/);
+  assert.doesNotMatch(
+    dashboard,
+    /Drive Ledger|Production storage register|Burberry Rain|Know what’s on/,
+  );
   assert.doesNotMatch(layout, /Drive Ledger|og\.png/);
   assert.doesNotMatch(`${dashboard}\n${layout}`, /codex-preview|SkeletonPreview/);
 
