@@ -224,6 +224,13 @@ function formatGigabytes(gb: number) {
   return `${Math.round(gb).toLocaleString("en-US")} GB`;
 }
 
+function formatTerabytes(gb: number) {
+  return `${(gb / 1000).toLocaleString("en-US", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 2,
+  })} TB`;
+}
+
 function capacityInputValue(gb: number, unit: CapacityUnit) {
   return unit === "TB" ? Number((gb / 1000).toFixed(3)) : gb;
 }
@@ -425,6 +432,7 @@ export function DriveDashboard() {
   const [fitSize, setFitSize] = useState("");
   const [searchedFitSize, setSearchedFitSize] = useState<number | null>(null);
   const [fitError, setFitError] = useState("");
+  const [summaryUnit, setSummaryUnit] = useState<CapacityUnit>("GB");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<ModalTab>("details");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -1032,13 +1040,25 @@ export function DriveDashboard() {
             <div className="stat-value">{stats.total}</div>
             <div className="stat-caption">registered with full history</div>
           </article>
-          <article className="stat-card">
+          <button
+            className="stat-card stat-card-toggle"
+            type="button"
+            aria-label={`Space left shown in ${summaryUnit}. Switch to ${summaryUnit === "GB" ? "TB" : "GB"}.`}
+            aria-pressed={summaryUnit === "TB"}
+            onClick={() => setSummaryUnit((current) => (current === "GB" ? "TB" : "GB"))}
+          >
             <div className="stat-label">
-              Space left <span className="stat-index">02</span>
+              Space left <span className="stat-index">02 · {summaryUnit}</span>
             </div>
-            <div className="stat-value">{formatGigabytes(stats.free)}</div>
-            <div className="stat-caption">{stats.usedPercent}% used overall</div>
-          </article>
+            <div className="stat-value">
+              {summaryUnit === "GB"
+                ? formatGigabytes(stats.free)
+                : formatTerabytes(stats.free)}
+            </div>
+            <div className="stat-caption">
+              {stats.usedPercent}% used overall · Click for {summaryUnit === "GB" ? "TB" : "GB"}
+            </div>
+          </button>
           <article className="stat-card">
             <div className="stat-label">
               Processing <span className="stat-index">03</span>
@@ -1231,12 +1251,12 @@ export function DriveDashboard() {
                     <col style={{ width: "4%" }} />
                     <col style={{ width: "15%" }} />
                     <col style={{ width: "13%" }} />
-                    <col style={{ width: "20%" }} />
+                    <col style={{ width: "18%" }} />
                     <col style={{ width: "12%" }} />
                     <col style={{ width: "11%" }} />
                     <col style={{ width: "11%" }} />
                     <col style={{ width: "10%" }} />
-                    <col style={{ width: "4%" }} />
+                    <col style={{ width: "6%" }} />
                   </colgroup>
                   <thead>
                     <tr>
