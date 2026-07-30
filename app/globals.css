@@ -495,6 +495,14 @@ textarea:focus-visible {
   margin-bottom: 13px;
 }
 
+.toolbar-filters {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .search-box {
   position: relative;
 }
@@ -548,6 +556,17 @@ textarea:focus-visible {
 .filter-tab[aria-pressed="true"] {
   background: var(--accent);
   color: white;
+}
+
+.permission-filter {
+  height: 46px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: #555d6d;
+  font-size: 12px;
+  font-weight: 620;
 }
 
 .bulk-bar {
@@ -639,6 +658,40 @@ textarea:focus-visible {
   letter-spacing: 0.08em;
   text-align: left;
   text-transform: uppercase;
+}
+
+.sort-button {
+  display: flex;
+  width: 100%;
+  height: 45px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.sort-button:hover,
+.sort-button-active {
+  color: var(--ink);
+}
+
+.sort-indicator {
+  flex: 0 0 auto;
+  color: #9a9ea8;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.sort-button-active .sort-indicator {
+  color: var(--accent);
 }
 
 .drive-table td {
@@ -1378,6 +1431,12 @@ textarea:focus-visible {
   font-size: 10px;
 }
 
+.capacity-input-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  gap: 7px;
+}
+
 .compact-field select {
   max-width: calc(50% - 9px);
 }
@@ -1642,6 +1701,10 @@ textarea:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .toolbar-filters {
+    justify-content: space-between;
+  }
+
   .history-toolbar {
     grid-template-columns: 1fr;
   }
@@ -1798,6 +1861,15 @@ textarea:focus-visible {
   }
 
   .filter-tabs {
+    width: 100%;
+  }
+
+  .toolbar-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .permission-filter {
     width: 100%;
   }
 

@@ -22,6 +22,11 @@ test("build contains the finished 4DV Studio hard drive tracker", async () => {
   assert.match(dashboard, /\?history=all/);
   assert.match(dashboard, /Select multiple drives/);
   assert.match(dashboard, /Edit selected drives/);
+  assert.match(dashboard, /SortableHeader/);
+  assert.match(dashboard, /Filter drives by delete permission/);
+  assert.match(dashboard, /Available options/);
+  assert.doesNotMatch(dashboard, /fitCandidates\.slice/);
+  assert.match(dashboard, /Choose TB or GB/);
   assert.match(driveApi, /bulk-updated/);
   assert.match(driveApi, /Select between 1 and 100 valid drives/);
   assert.doesNotMatch(driveApi, /requireTrackerAccess|tracker-auth/);
