@@ -120,23 +120,6 @@ textarea:focus-visible {
   gap: 18px;
 }
 
-.signout-button {
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: white;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.signout-button:hover {
-  border-color: #b9c2d0;
-  color: var(--ink);
-}
-
 .sync-dot {
   width: 7px;
   height: 7px;
@@ -218,115 +201,6 @@ textarea:focus-visible {
   left: 0;
   height: 2px;
   background: var(--accent);
-}
-
-.access-page {
-  display: grid;
-  min-height: 100dvh;
-  place-items: center;
-  padding: 32px 20px;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(49, 91, 214, 0.14), transparent 30%),
-    radial-gradient(circle at 88% 92%, rgba(49, 91, 214, 0.1), transparent 32%),
-    #f4f6fa;
-}
-
-.access-card {
-  width: min(480px, 100%);
-  padding: 34px;
-  border: 1px solid #dfe3eb;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 24px 70px rgba(29, 42, 76, 0.12);
-}
-
-.access-brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  font-size: 14px;
-  font-weight: 720;
-}
-
-.access-heading {
-  margin-top: 52px;
-}
-
-.access-heading > p {
-  margin: 0 0 13px;
-  color: var(--accent);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
-  font-weight: 680;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.access-heading h1 {
-  margin: 0;
-  font-size: clamp(35px, 8vw, 48px);
-  font-weight: 690;
-  letter-spacing: -0.055em;
-  line-height: 0.98;
-}
-
-.access-heading > span {
-  display: block;
-  max-width: 360px;
-  margin-top: 18px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.access-form {
-  display: grid;
-  gap: 9px;
-  margin-top: 32px;
-}
-
-.access-form label {
-  color: #555d6d;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 9px;
-  font-weight: 680;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.access-form input {
-  width: 100%;
-  height: 50px;
-  padding: 0 14px;
-  border: 1px solid #cfd5e0;
-  border-radius: 8px;
-  background: white;
-  color: var(--ink);
-}
-
-.access-form input:focus {
-  border-color: var(--accent);
-}
-
-.access-error {
-  margin: 1px 0 0;
-  color: var(--red);
-  font-size: 11px;
-}
-
-.access-submit {
-  width: 100%;
-  margin-top: 5px;
-}
-
-.access-footnote {
-  margin: 23px 0 0;
-  color: #9aa0ac;
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 8px;
-  letter-spacing: 0.08em;
-  text-align: center;
-  text-transform: uppercase;
 }
 
 .hero {
@@ -1848,25 +1722,6 @@ textarea:focus-visible {
 
   .main {
     padding: 26px 16px 48px;
-  }
-
-  .access-page {
-    align-items: stretch;
-    padding: 0;
-    background: white;
-  }
-
-  .access-card {
-    width: 100%;
-    min-height: 100dvh;
-    padding: 28px 22px;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  .access-heading {
-    margin-top: 72px;
   }
 
   .page-heading {
