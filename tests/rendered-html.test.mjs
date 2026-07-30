@@ -30,7 +30,7 @@ test("build contains the finished 4DV Studio hard drive tracker", async () => {
   assert.match(accessApi, /trackerAccessCookie/);
   assert.match(auth, /HttpOnly/);
   assert.match(auth, /TRACKER_PASSWORD/);
-  assert.doesNotMatch(`${dashboard}\n${driveApi}\n${accessPage}\n${accessApi}\n${auth}`, /fanxyytracking/);
+  assert.doesNotMatch(auth, /TRACKER_PASSWORD\s*\?\?\s*["'][^"']+["']/);
   assert.match(layout, /4DV Studio — Hard Drive Tracking System/);
   assert.doesNotMatch(
     dashboard,
