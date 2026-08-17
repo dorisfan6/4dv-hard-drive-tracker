@@ -7,6 +7,7 @@ import {
   serializeDrive,
   summarizeChanges,
 } from "../../../../db/drive-store";
+import { authorizeTrackerApi } from "../../../tracker-access";
 
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxBytes = 8 * 1024 * 1024;
@@ -19,6 +20,8 @@ function photoError(error: unknown, status = 500) {
 }
 
 export async function GET(request: Request) {
+  const authorization = await authorizeTrackerApi();
+  if (authorization.error) return authorization.error;
   try {
     const key = new URL(request.url).searchParams.get("key") ?? "";
     if (!key.startsWith("drive-photos/")) {
@@ -37,6 +40,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const authorization = await authorizeTrackerApi();
+  if (authorization.error) return authorization.error;
   try {
     const formData = await request.formData();
     const driveId = Number(formData.get("driveId"));

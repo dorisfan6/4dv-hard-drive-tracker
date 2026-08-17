@@ -418,7 +418,19 @@ function baselineContents(entry: HistoryEntry) {
   }
 }
 
-export function DriveDashboard() {
+type DriveDashboardProps = {
+  currentUser: { email: string; displayName: string };
+  isOwner: boolean;
+  pendingAccessCount: number;
+  signOutPath: string;
+};
+
+export function DriveDashboard({
+  currentUser,
+  isOwner,
+  pendingAccessCount,
+  signOutPath,
+}: DriveDashboardProps) {
   const [drives, setDrives] = useState<Drive[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -997,6 +1009,22 @@ export function DriveDashboard() {
           <div className="sync-status">
             <span className="sync-dot" aria-hidden="true" />
             <span>History tracking on</span>
+          </div>
+          {isOwner ? (
+            <a className="access-requests-link" href="/access">
+              Access requests
+              {pendingAccessCount ? <span>{pendingAccessCount}</span> : null}
+            </a>
+          ) : null}
+          <div className="account-menu">
+            <span className="account-avatar" aria-hidden="true">
+              {(currentUser.displayName || currentUser.email).slice(0, 1).toUpperCase()}
+            </span>
+            <span className="account-copy">
+              <strong>{currentUser.displayName}</strong>
+              <small>{currentUser.email}</small>
+            </span>
+            <a href={signOutPath}>Sign out</a>
           </div>
         </div>
       </header>
