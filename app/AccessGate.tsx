@@ -61,7 +61,7 @@ export function AccessGate({
           <p className="access-eyebrow">Secure studio operations</p>
           <h1>Hard Drive<br />Tracking System</h1>
           <p>
-            One approved workspace for drive inventory, available capacity,
+            One approved tracker for drive inventory, available capacity,
             processing status, photos, and change history.
           </p>
         </div>
@@ -75,7 +75,7 @@ export function AccessGate({
               {mode === "signup" ? (
                 <>
                   <div className="access-icon" aria-hidden="true">＋</div>
-                  <p className="access-kicker">New workspace account</p>
+                  <p className="access-kicker">New tracker account</p>
                   <h2>Create your account</h2>
                   <p className="access-copy">
                     First confirm your email identity. Then you can
