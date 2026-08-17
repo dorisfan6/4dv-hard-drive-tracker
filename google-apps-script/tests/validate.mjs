@@ -16,6 +16,7 @@ new Function(scriptMatch[1]);
 const requiredFunctions = [
   "doGet",
   "setupTracker",
+  "allowAnyGoogleAccount",
   "getAccessState",
   "getAccessStateJson",
   "requestAccess",

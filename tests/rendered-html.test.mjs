@@ -59,7 +59,7 @@ test("build contains the protected 4DV Studio hard drive tracker", async () => {
   assert.match(accessGate, /Register for access/);
   assert.match(accessGate, /Request owner approval/);
   assert.match(accessGate, /Create an account/);
-  assert.match(accessGate, /Log in with workspace account/);
+  assert.match(accessGate, /Log in with email account/);
   assert.match(accessAdmin, /Approve/);
   assert.match(accessAdmin, /Reject/);
   assert.match(accessStore, /CREATE TABLE IF NOT EXISTS tracker_users/);

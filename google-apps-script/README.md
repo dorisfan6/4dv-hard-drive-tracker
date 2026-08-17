@@ -7,7 +7,7 @@ This folder is a Google Apps Script version of the existing tracker. It does not
 - `Drives` sheet: current hard drive inventory
 - `History` sheet: append-only activity history
 - Google Drive folder: uploaded JPG, PNG, and WebP drive photos
-- Script Properties: Spreadsheet ID, photo folder ID, and optional Workspace domain
+- Script Properties: Spreadsheet ID, photo folder ID, owner email, and an optional domain restriction
 
 The migration workbook already uses the expected `Drives` and `History` headers. Importing that workbook preserves the existing 19 drive records and 84 exported History rows.
 
@@ -41,10 +41,10 @@ setupTracker('', '', 'COMPANY_DOMAIN.com');
 
 1. Select **Deploy → New deployment → Web app**.
 2. Use **Execute as: Me**.
-3. Restrict access to users in the company Google Workspace domain.
+3. Choose **Anyone with Google account** so any verified email can request access.
 4. Deploy and share the `/exec` URL. The `/dev` URL is only for editors testing the latest saved code.
 
-The deployment access policy is the primary security boundary. `ALLOWED_DOMAIN` adds a second check when Google exposes the signed-in user's email to the script.
+Run `allowAnyGoogleAccount()` once as the owner when migrating a project that previously used an `ALLOWED_DOMAIN` restriction. Google verifies the account email; the app owner must still approve every new registration before tracker data is available.
 
 ## Updating the app
 

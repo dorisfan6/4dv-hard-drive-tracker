@@ -349,13 +349,13 @@
           <h1>Hard Drive Tracking System</h1>
           <p>A shared register for drive inventory, available capacity, physical location, and change history.</p>
         </div>
-        <div class="access-brand-foot">Google Workspace protected · 4dv.ai</div>
+        <div class="access-brand-foot">Google account verified · Owner approval required</div>
       </aside>
       <main class="access-panel">
         <div class="access-card" id="access-card">
           <p class="access-step">Checking access</p>
           <h2>Connecting your workspace account…</h2>
-          <p class="access-intro">We’re verifying your Google Workspace identity and tracker permission.</p>
+          <p class="access-intro">We’re verifying your Google account email and tracker permission.</p>
         </div>
       </main>
     </section>
@@ -365,7 +365,7 @@
       <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>4DV Studio</span></div>
       <div class="topbar-actions">
         <button class="access-requests-button" id="access-requests-button" hidden>Access requests <span class="access-badge" id="access-badge">0</span></button>
-        <div class="sync"><span class="sync-dot"></span><span id="sync-label">Google Workspace · History tracking on</span></div>
+        <div class="sync"><span class="sync-dot"></span><span id="sync-label">Google account · History tracking on</span></div>
       </div>
     </header>
 
@@ -550,9 +550,9 @@
 
       function accessRequestForm(access, rejected = false) {
         return `${rejected ? '<div class="access-alert">Your last request was not approved. You can update the details and submit it again.</div>' : ""}
-          <p class="access-step">Workspace access</p>
+          <p class="access-step">Email access</p>
           <h2>Request tracker access</h2>
-          <p class="access-intro">You’re signed in with Google Workspace. The tracker owner needs to approve your account before you can view or edit drive records.</p>
+          <p class="access-intro">Your Google account email is verified. The tracker owner needs to approve it before you can view or edit drive records.</p>
           ${accessIdentity(access)}
           <form class="access-form" id="access-request-form">
             <div class="access-field"><label for="access-name">Name</label><input id="access-name" maxlength="120" required value="${escapeHtml(access.displayName || "")}" autocomplete="name"></div>
@@ -565,9 +565,9 @@
 
       function renderAccessLogin(access) {
         $("#access-card").innerHTML = `<div class="access-state-icon approved">↗</div>
-          <p class="access-step">Workspace sign in</p>
+          <p class="access-step">Google sign in</p>
           <h2>Welcome back</h2>
-          <p class="access-intro">Log in with an approved company account to open the hard drive tracker.</p>
+          <p class="access-intro">Log in with any approved Google account to open the hard drive tracker.</p>
           ${accessIdentity(access)}
           <div class="access-alert" id="access-login-error" hidden></div>
           <button class="button button-primary access-submit" id="access-login" type="button" style="width:100%">Log in to tracker</button>

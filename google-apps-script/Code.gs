@@ -119,8 +119,7 @@ function setupTracker(spreadsheetIdOrUrl, photoFolderIdOrUrl, allowedDomain) {
     : DriveApp.createFolder("4DV Hard Drive Tracker Photos");
 
   var email = String(Session.getActiveUser().getEmail() || "").toLowerCase();
-  var inferredDomain = email.indexOf("@") > -1 ? email.split("@").pop() : "";
-  var domain = String(allowedDomain || inferredDomain || "")
+  var domain = String(allowedDomain || "")
     .trim()
     .toLowerCase()
     .replace(/^@/, "");
@@ -138,6 +137,19 @@ function setupTracker(spreadsheetIdOrUrl, photoFolderIdOrUrl, allowedDomain) {
     photoFolderId: folder.getId(),
     allowedDomain: domain
   };
+}
+
+/**
+ * Removes the optional domain restriction while keeping Google-account email
+ * verification and owner approval in place. Run once before deploying the web
+ * app for "Anyone with Google account" access.
+ */
+function allowAnyGoogleAccount() {
+  assertDomainAuthorized_();
+  var email = currentUserEmail_();
+  if (email !== getOwnerEmail_()) throw new Error("Only the tracker owner can change signup access.");
+  getProperties_().setProperty(APP.allowedDomainProperty, "");
+  return { allowedDomain: "", ownerEmail: email };
 }
 
 function getAccessState() {
@@ -924,7 +936,7 @@ function assertDomainAuthorized_() {
 
 function currentUserEmail_() {
   var email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
-  if (!email) throw new Error("Sign in with your company Google account to continue.");
+  if (!email) throw new Error("Sign in with a Google account to continue.");
   return email;
 }
 

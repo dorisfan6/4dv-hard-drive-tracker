@@ -78,7 +78,7 @@ export function AccessGate({
                   <p className="access-kicker">New workspace account</p>
                   <h2>Create your account</h2>
                   <p className="access-copy">
-                    First confirm your company Workspace identity. Then you can
+                    First confirm your email identity. Then you can
                     complete your profile and send it to the tracker owner for approval.
                   </p>
                   <a className="button button-primary access-primary" href={signInPath}>
@@ -89,13 +89,13 @@ export function AccessGate({
               ) : (
                 <>
                   <div className="access-icon" aria-hidden="true">↗</div>
-                  <p className="access-kicker">Workspace sign in</p>
+                  <p className="access-kicker">Email sign in</p>
                   <h2>Welcome back</h2>
                   <p className="access-copy">
-                    Log in with your approved company account to open the hard drive tracker.
+                    Log in with your approved email account to open the hard drive tracker.
                   </p>
                   <a className="button button-primary access-primary" href={signInPath}>
-                    Log in with workspace account
+                    Log in with email account
                   </a>
                   <div className="access-divider"><span>New to the tracker?</span></div>
                   <a className="button access-primary access-secondary" href="/signup">
@@ -139,7 +139,7 @@ export function AccessGate({
                   />
                 </label>
                 <label>
-                  <span>Company email</span>
+                  <span>Email</span>
                   <input value={user?.email || ""} readOnly aria-readonly="true" />
                 </label>
                 <label>
