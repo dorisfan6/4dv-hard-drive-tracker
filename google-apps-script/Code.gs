@@ -20,6 +20,7 @@ var APP = Object.freeze({
   statuses: ["waiting", "processing", "processed"],
   permissions: ["clear", "ask", "protected"],
   brands: ["samsung", "sandisk", "other"],
+  formats: ["unknown", "exfat", "apfs", "hfs-plus", "ntfs", "fat32", "ext4", "other"],
   locations: ["4dv-studio", "data-center", "other"],
   driveHeaders: [
     "drive_id",
@@ -33,6 +34,8 @@ var APP = Object.freeze({
     "delete_permission",
     "brand",
     "custom_brand",
+    "drive_format",
+    "custom_format",
     "location_type",
     "location",
     "note",
@@ -58,6 +61,7 @@ var APP = Object.freeze({
   ],
   accessHeaders: [
     "email",
+    "user_key",
     "display_name",
     "note",
     "status",
@@ -78,13 +82,14 @@ var DRIVE_FIELDS = Object.freeze([
   { key: "deletePermission", label: "Can delete?" },
   { key: "brand", label: "Brand" },
   { key: "customBrand", label: "Other brand" },
+  { key: "fileSystem", label: "Drive format" },
+  { key: "customFileSystem", label: "Other format" },
   { key: "locationType", label: "Location type" },
   { key: "location", label: "Physical location" },
   { key: "note", label: "Note" }
 ]);
 
 function doGet() {
-  assertDomainAuthorized_();
   return HtmlService.createHtmlOutputFromFile("Index")
     .setTitle(APP.title)
     .addMetaTag("viewport", "width=device-width, initial-scale=1, viewport-fit=cover")
@@ -156,16 +161,19 @@ function getAccessState() {
   assertDomainAuthorized_();
   var spreadsheet = getSpreadsheet_();
   var table = readAccessTable_(spreadsheet);
-  var email = currentUserEmail_();
+  var sessionEmail = sessionEmail_();
+  var userKey = sessionUserKey_();
   var ownerEmail = getOwnerEmail_();
-  var record = accessRecordFromTable_(table, email);
-  var isOwner = email === ownerEmail;
+  var record = accessRecordFromIdentity_(table, sessionEmail, userKey);
+  var email = sessionEmail || (record ? record.email : "");
+  var isOwner = sessionEmail === ownerEmail;
   return {
     email: email,
     displayName: record ? record.displayName : email.split("@")[0],
     note: record ? record.note : "",
     status: isOwner ? "approved" : (record ? record.status : "unregistered"),
     isOwner: isOwner,
+    requiresEmail: !email,
     requestedAt: record ? record.requestedAt : "",
     requests: isOwner ? table.rows.map(function (row) {
       return accessRecordFromRow_(table.headers, row);
@@ -177,10 +185,22 @@ function getAccessStateJson() {
   return JSON.stringify(getAccessState());
 }
 
-function requestAccess(displayName, note) {
+function requestAccess(emailAddress, displayName, note) {
   assertDomainAuthorized_();
-  var email = currentUserEmail_();
-  if (email === getOwnerEmail_()) return getAccessState();
+  if (arguments.length < 3) {
+    note = displayName;
+    displayName = emailAddress;
+    emailAddress = "";
+  }
+  var sessionEmail = sessionEmail_();
+  var userKey = sessionUserKey_();
+  var email = sessionEmail || normalizeEmail_(emailAddress);
+  if (!email) throw new Error("Enter a valid email address for the owner to approve.");
+  if (!sessionEmail && !userKey) throw new Error("Google could not identify this browser session. Sign in and try again.");
+  if (email === getOwnerEmail_()) {
+    if (sessionEmail === email) return getAccessState();
+    throw new Error("Open the owner account with its signed-in Google profile.");
+  }
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -189,8 +209,14 @@ function requestAccess(displayName, note) {
     var table = readTable_(sheet);
     var cleanName = String(displayName || email.split("@")[0]).trim().slice(0, 120);
     var cleanNote = String(note || "").trim().slice(0, 500);
+    var identityRecord = accessRecordFromIdentity_(table, sessionEmail, userKey);
+    var emailRecord = accessRecordFromTable_(table, email);
+    if (emailRecord && (!identityRecord || emailRecord.email !== identityRecord.email)) {
+      throw new Error("That email is already registered. Ask the tracker owner to review the existing account.");
+    }
     var record = {
       email: email,
+      user_key: userKey,
       display_name: cleanName,
       note: cleanNote,
       status: "pending",
@@ -199,7 +225,9 @@ function requestAccess(displayName, note) {
       reviewed_by: ""
     };
     var index = table.rows.findIndex(function (row) {
-      return String(rowValue_(table.headers, row, "email") || "").toLowerCase() === email;
+      var rowEmail = String(rowValue_(table.headers, row, "email") || "").toLowerCase();
+      var rowKey = String(rowValue_(table.headers, row, "user_key") || "");
+      return rowEmail === email || (userKey && rowKey === userKey);
     });
     if (index > -1) writeRecordToRow_(sheet, table.headers, index + 2, record);
     else appendRecord_(sheet, table.headers, record);
@@ -209,8 +237,8 @@ function requestAccess(displayName, note) {
   }
 }
 
-function requestAccessJson(displayName, note) {
-  return JSON.stringify(requestAccess(displayName, note));
+function requestAccessJson(emailAddress, displayName, note) {
+  return JSON.stringify(requestAccess(emailAddress, displayName, note));
 }
 
 function reviewAccessRequest(email, decision) {
@@ -245,13 +273,13 @@ function reviewAccessRequestJson(email, decision) {
 }
 
 function getBootstrap() {
-  assertAuthorized_();
+  var access = assertAuthorized_();
   var spreadsheet = getSpreadsheet_();
   ensureWorkbook_(spreadsheet);
   return {
     drives: readDrives_(spreadsheet),
     user: {
-      email: String(Session.getActiveUser().getEmail() || ""),
+      email: access.email,
       domain: getProperties_().getProperty(APP.allowedDomainProperty) || ""
     }
   };
@@ -357,7 +385,7 @@ function bulkUpdateDrives(ids, updates) {
     : [];
   if (!normalizedIds.length) throw new Error("Select at least one hard drive.");
 
-  var allowed = ["status", "deletePermission", "brand", "customBrand", "locationType", "location"];
+  var allowed = ["status", "deletePermission", "brand", "customBrand", "fileSystem", "customFileSystem", "locationType", "location"];
   var requested = {};
   Object.keys(updates || {}).forEach(function (key) {
     if (allowed.indexOf(key) > -1) requested[key] = updates[key];
@@ -622,9 +650,22 @@ function accessRecordFromTable_(table, email) {
   return null;
 }
 
+function accessRecordFromIdentity_(table, email, userKey) {
+  var normalizedEmail = normalizeEmail_(email);
+  for (var index = 0; index < table.rows.length; index += 1) {
+    var rowEmail = String(rowValue_(table.headers, table.rows[index], "email") || "").toLowerCase();
+    var rowKey = String(rowValue_(table.headers, table.rows[index], "user_key") || "");
+    if ((normalizedEmail && rowEmail === normalizedEmail) || (userKey && rowKey === userKey)) {
+      return accessRecordFromRow_(table.headers, table.rows[index]);
+    }
+  }
+  return null;
+}
+
 function accessRecordFromRow_(headers, row) {
   return {
     email: String(rowValue_(headers, row, "email") || "").toLowerCase(),
+    userKey: String(rowValue_(headers, row, "user_key") || ""),
     displayName: String(rowValue_(headers, row, "display_name") || ""),
     note: String(rowValue_(headers, row, "note") || ""),
     status: String(rowValue_(headers, row, "status") || "pending"),
@@ -667,6 +708,7 @@ function applyDriveValidations_(sheet) {
     status: APP.statuses,
     delete_permission: APP.permissions,
     brand: APP.brands,
+    drive_format: APP.formats,
     location_type: APP.locations
   };
   var headers = readHeaders_(sheet);
@@ -785,6 +827,8 @@ function cleanDrive_(payload) {
     : "ask";
   var brand = includes_(APP.brands, payload.brand) ? String(payload.brand) : "other";
   var customBrand = brand === "other" ? String(payload.customBrand || "").trim() : "";
+  var fileSystem = includes_(APP.formats, payload.fileSystem) ? String(payload.fileSystem) : "unknown";
+  var customFileSystem = fileSystem === "other" ? String(payload.customFileSystem || "").trim() : "";
   var locationType = includes_(APP.locations, payload.locationType)
     ? String(payload.locationType)
     : "other";
@@ -811,6 +855,8 @@ function cleanDrive_(payload) {
     deletePermission: permission,
     brand: brand,
     customBrand: customBrand,
+    fileSystem: fileSystem,
+    customFileSystem: customFileSystem,
     locationType: locationType,
     location: location,
     note: note
@@ -830,6 +876,8 @@ function driveFromRow_(headers, row) {
     deletePermission: String(rowValue_(headers, row, "delete_permission") || "ask"),
     brand: String(rowValue_(headers, row, "brand") || "other"),
     customBrand: String(rowValue_(headers, row, "custom_brand") || ""),
+    fileSystem: String(rowValue_(headers, row, "drive_format") || "unknown"),
+    customFileSystem: String(rowValue_(headers, row, "custom_format") || ""),
     locationType: String(rowValue_(headers, row, "location_type") || "other"),
     location: String(rowValue_(headers, row, "location") || ""),
     note: String(rowValue_(headers, row, "note") || ""),
@@ -853,6 +901,8 @@ function driveToRecord_(drive) {
     delete_permission: drive.deletePermission,
     brand: drive.brand,
     custom_brand: drive.customBrand,
+    drive_format: drive.fileSystem || "unknown",
+    custom_format: drive.customFileSystem || "",
     location_type: drive.locationType,
     location: drive.location,
     note: drive.note,
@@ -874,6 +924,8 @@ function driveSnapshot_(drive) {
     deletePermission: drive.deletePermission,
     brand: drive.brand,
     customBrand: drive.customBrand,
+    fileSystem: drive.fileSystem || "unknown",
+    customFileSystem: drive.customFileSystem || "",
     locationType: drive.locationType,
     location: drive.location,
     date: drive.date,
@@ -918,26 +970,41 @@ function getProperties_() {
 
 function assertAuthorized_() {
   assertDomainAuthorized_();
-  var email = currentUserEmail_();
-  if (email === getOwnerEmail_()) return;
-  var record = accessRecordFromTable_(readAccessTable_(getSpreadsheet_()), email);
+  var sessionEmail = sessionEmail_();
+  var userKey = sessionUserKey_();
+  if (sessionEmail === getOwnerEmail_()) return { email: sessionEmail, isOwner: true };
+  var record = accessRecordFromIdentity_(readAccessTable_(getSpreadsheet_()), sessionEmail, userKey);
   if (!record || record.status !== "approved") {
     throw new Error("Your tracker access is awaiting owner approval.");
   }
+  return { email: record.email, isOwner: false };
 }
 
 function assertDomainAuthorized_() {
   var domain = String(getProperties_().getProperty(APP.allowedDomainProperty) || "").toLowerCase();
-  var email = currentUserEmail_();
+  var email = sessionEmail_();
   if (domain && email && !email.endsWith("@" + domain)) {
     throw new Error("This tracker is limited to the " + domain + " Google Workspace.");
   }
 }
 
 function currentUserEmail_() {
-  var email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+  var email = sessionEmail_();
   if (!email) throw new Error("Sign in with a Google account to continue.");
   return email;
+}
+
+function sessionEmail_() {
+  return String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+}
+
+function sessionUserKey_() {
+  return String(Session.getTemporaryActiveUserKey() || "").trim();
+}
+
+function normalizeEmail_(value) {
+  var email = String(value || "").trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
 }
 
 function getOwnerEmail_() {

@@ -66,7 +66,11 @@ const serverFactory = new Function(
 );
 const serverHelpers = serverFactory(
   { formatDate: () => "2026-08-10", base64Encode: () => "" },
-  { getScriptTimeZone: () => "America/Los_Angeles", getActiveUser: () => ({ getEmail: () => "tester@example.com" }) }
+  {
+    getScriptTimeZone: () => "America/Los_Angeles",
+    getActiveUser: () => ({ getEmail: () => "tester@example.com" }),
+    getTemporaryActiveUserKey: () => "temporary-user-key"
+  }
 );
 const sample = serverHelpers.cleanDrive_({
   driveNumber: " gm_1 ",
@@ -79,12 +83,17 @@ const sample = serverHelpers.cleanDrive_({
   deletePermission: "ask",
   brand: "other",
   customBrand: "",
+  fileSystem: "exfat",
+  customFileSystem: "",
   locationType: "other",
   location: "Shelf 2",
   note: ""
 });
 if (sample.driveNumber !== "GM_1" || sample.spaceLeftGb !== 300) {
   throw new Error("Drive normalization failed.");
+}
+if (sample.fileSystem !== "exfat") {
+  throw new Error("Drive format normalization failed.");
 }
 const changes = serverHelpers.buildDriveChanges_(
   { ...sample, status: "waiting", location: "Shelf 1" },
@@ -116,11 +125,26 @@ if (!html.includes('serverJson("getAccessStateJson")')) {
 if (!html.includes('serverJson("requestAccessJson"')) {
   throw new Error("Access registration is not connected to Apps Script.");
 }
+if (!code.includes('"user_key"') || !code.includes("getTemporaryActiveUserKey")) {
+  throw new Error("Access registration does not support Google's hidden-email sessions.");
+}
+if (!html.includes('id="access-email"')) {
+  throw new Error("Fallback email registration field is missing.");
+}
 if (!html.includes('serverJson("reviewAccessRequestJson"')) {
   throw new Error("Owner approval is not connected to Apps Script.");
 }
 if (!html.includes('id="access-shell"') || !html.includes('id="access-modal"')) {
   throw new Error("The login or owner approval interface is missing.");
+}
+if (!code.includes('"drive_format"') || !code.includes('fileSystem')) {
+  throw new Error("Drive format is not persisted in Apps Script.");
+}
+if (!html.includes('id="drive-format"') || !html.includes('data-fit-os="mac"')) {
+  throw new Error("Drive format or computer compatibility controls are missing.");
+}
+if (!html.includes("WRITABLE_FORMATS") || !html.includes("isWritableOn")) {
+  throw new Error("Capacity search does not filter by writable drive format.");
 }
 if (!html.includes('id="open-signup"') || !html.includes('accessView:')) {
   throw new Error("The separate signup view is missing.");

@@ -97,6 +97,11 @@
       .fit-title { font-size: 22px; letter-spacing: -.02em; }
       .fit-copy { margin: 6px 0 0; color: #b9c1ce; font-size: 12px; }
       .fit-search { display: flex; gap: 8px; flex-wrap: wrap; }
+      .fit-os { flex-basis: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .fit-os-label { color: #b9c1ce; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+      .fit-os-options { display: flex; gap: 4px; padding: 3px; border: 1px solid #49515e; border-radius: 9px; background: #2b303a; }
+      .fit-os-button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #b9c1ce; cursor: pointer; font-size: 11px; font-weight: 800; }
+      .fit-os-button[aria-pressed="true"] { background: #7dcfe4; color: #17202a; }
       .fit-input-wrap { flex: 1; min-width: 180px; display: flex; align-items: center; overflow: hidden; border-radius: 9px; background: white; }
       .fit-input { width: 100%; min-height: 42px; border: 0; padding: 0 13px; outline: 0; }
       .fit-unit { padding-right: 12px; color: var(--muted); font-size: 12px; font-weight: 800; }
@@ -149,13 +154,15 @@
       .drive-number { font-weight: 800; letter-spacing: -.01em; }
       .drive-label, .drive-brand, .cell-subtle { color: var(--muted); font-size: 12px; }
       .drive-brand { margin-top: 2px; color: #8a93a3; }
-      .status-pill, .delete-pill, .event-chip { display: inline-flex; align-items: center; min-height: 25px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 800; }
+      .status-pill, .delete-pill, .format-pill, .event-chip { display: inline-flex; align-items: center; min-height: 25px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 800; }
       .status-waiting { background: var(--amber-soft); color: var(--amber); }
       .status-processing { background: var(--blue-soft); color: var(--blue); }
       .status-processed { background: var(--green-soft); color: var(--green); }
       .delete-clear { background: var(--green-soft); color: var(--green); }
       .delete-ask { background: var(--amber-soft); color: var(--amber); }
       .delete-protected { background: var(--red-soft); color: var(--red); }
+      .format-pill { border-radius: 6px; background: #eef1f5; color: #4f5b6c; white-space: nowrap; }
+      .format-unknown { background: #f2f3f5; color: #8a93a3; }
       .content-list { display: flex; flex-wrap: wrap; gap: 4px; }
       .content-tag { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 7px; border-radius: 5px; background: #f0f2f5; font-size: 11px; }
       .capacity-line { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
@@ -180,6 +187,7 @@
       .event-status { background: var(--blue-soft); color: var(--blue); }
       .event-location { background: var(--cyan-soft); color: #156b7c; }
       .event-capacity { background: #f0ecff; color: #6948b8; }
+      .event-format { background: #e8f5ef; color: #24714e; }
       .history-note { color: var(--muted); font-size: 11px; }
 
       .error-banner { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin: 16px 0; padding: 12px 14px; border: 1px solid #f1c7cd; border-radius: 10px; background: var(--red-soft); color: var(--red); }
@@ -392,8 +400,9 @@
         </section>
 
         <section class="fit-panel">
-          <div><p class="fit-kicker">Capacity search</p><h2 class="fit-title">Will the new file fit?</h2><p class="fit-copy">Enter the file size, then search every drive with enough room.</p></div>
+          <div><p class="fit-kicker">Capacity + format search</p><h2 class="fit-title">Will the new file fit?</h2><p class="fit-copy">Choose the computer, then find writable formats with enough room.</p></div>
           <form class="fit-search" id="fit-form">
+            <div class="fit-os"><span class="fit-os-label">Write from</span><div class="fit-os-options" aria-label="Choose computer operating system"><button class="fit-os-button" type="button" data-fit-os="mac" aria-pressed="true">Mac</button><button class="fit-os-button" type="button" data-fit-os="windows" aria-pressed="false">Windows</button><button class="fit-os-button" type="button" data-fit-os="linux" aria-pressed="false">Linux</button></div></div>
             <label class="fit-input-wrap"><input class="fit-input" id="fit-size" type="number" min="1" step="1" placeholder="e.g. 500" aria-label="New file size in gigabytes"><span class="fit-unit">GB</span></label>
             <button class="button button-primary" type="submit">Search</button>
             <p class="fit-error" id="fit-error" hidden></p>
@@ -406,7 +415,7 @@
         <section class="inventory">
           <div class="section-head"><div><h2 class="section-title">Drive inventory</h2><p class="section-kicker" id="inventory-count">硬盘清单 · 0 shown</p></div><button class="button button-ghost" id="new-record">＋ New record</button></div>
           <div class="toolbar">
-            <label class="search-box"><input id="drive-search" placeholder="Search drive #, contents, brand, location or note…" aria-label="Search drive inventory"></label>
+            <label class="search-box"><input id="drive-search" placeholder="Search drive #, contents, format, brand, location or note…" aria-label="Search drive inventory"></label>
             <div class="toolbar-filters">
               <div class="filter-tabs" id="status-filters" aria-label="Filter drives by status">
                 <button class="filter-tab" data-status="all" aria-pressed="true">All drives</button>
@@ -432,10 +441,10 @@
 
       <section class="history-view" id="history-page" hidden>
         <div class="section-head"><div><h2 class="section-title">Drive history</h2><p class="section-kicker" id="history-count">Important changes across every hard drive</p></div><button class="button button-ghost" id="refresh-history">Refresh history</button></div>
-        <div class="history-toolbar"><label class="search-box"><input id="history-search" placeholder="Search drive number, event or value…" aria-label="Search drive history"></label><select id="history-filter" aria-label="Filter history by event"><option value="all">All activity</option><option value="status">Status</option><option value="location">Location</option><option value="contents">Contents</option><option value="capacity">Capacity</option><option value="permission">Delete permission</option><option value="brand">Brand</option><option value="photo">Photo</option></select></div>
+        <div class="history-toolbar"><label class="search-box"><input id="history-search" placeholder="Search drive number, event or value…" aria-label="Search drive history"></label><select id="history-filter" aria-label="Filter history by event"><option value="all">All activity</option><option value="status">Status</option><option value="location">Location</option><option value="contents">Contents</option><option value="capacity">Capacity</option><option value="format">Drive format</option><option value="permission">Delete permission</option><option value="brand">Brand</option><option value="photo">Photo</option></select></div>
         <div class="error-banner" id="history-error" hidden><span></span><button class="button button-small" id="retry-history">Try again</button></div>
         <div class="table-wrap" id="history-table-wrap"><div class="empty-state">Open History to load activity.</div></div>
-        <p class="history-note">Status, location, contents, capacity, permission, brand, photo, and record changes are retained in the History sheet.</p>
+        <p class="history-note">Status, location, contents, capacity, format, permission, brand, photo, and record changes are retained in the History sheet.</p>
       </section>
     </main>
 
@@ -461,6 +470,8 @@
                 <div class="field"><label for="drive-date">Last checked</label><input id="drive-date" type="date"></div>
                 <div class="field"><label for="drive-brand">Brand / model</label><select id="drive-brand"><option value="samsung">Samsung</option><option value="sandisk">SanDisk</option><option value="other">Other</option></select></div>
                 <div class="field" id="custom-brand-field" hidden><label for="drive-custom-brand">Other brand / model</label><input id="drive-custom-brand" placeholder="e.g. LaCie, G-Drive"></div>
+                <div class="field"><label for="drive-format">Drive format</label><select id="drive-format"><option value="unknown">Unknown / not checked</option><option value="exfat">exFAT</option><option value="apfs">APFS</option><option value="hfs-plus">Mac OS Extended (HFS+)</option><option value="ntfs">NTFS</option><option value="fat32">FAT32</option><option value="ext4">ext4</option><option value="other">Other</option></select></div>
+                <div class="field" id="custom-format-field" hidden><label for="drive-custom-format">Other format</label><input id="drive-custom-format" placeholder="Enter file system format"></div>
                 <div class="field"><label for="drive-permission">Can delete?</label><select id="drive-permission"><option value="clear">Clear — safe to delete</option><option value="ask">Ask first</option><option value="protected">Protected — do not delete</option></select></div>
                 <div class="field"><label for="drive-total">Total storage</label><div class="capacity-group"><input id="drive-total" type="number" min="0.001" step="0.001" required><select id="drive-unit" aria-label="Capacity unit"><option value="TB">TB</option><option value="GB">GB</option></select></div><p class="field-hint">Choose TB or GB · 1 TB = 1,000 GB</p></div>
                 <div class="field"><label for="drive-free">Space left (GB)</label><input id="drive-free" type="number" min="0" step="1" required></div>
@@ -487,6 +498,7 @@
           <section class="bulk-option" data-bulk-option="location"><label class="bulk-toggle"><input class="selection" type="checkbox" id="bulk-change-location">Physical location</label><div class="bulk-controls"><select id="bulk-location-type" disabled><option value="4dv-studio">4DV Studio</option><option value="data-center">Data Center</option><option value="other">Other</option></select><input id="bulk-location" placeholder="Enter physical location" disabled hidden></div></section>
           <section class="bulk-option" data-bulk-option="permission"><label class="bulk-toggle"><input class="selection" type="checkbox" id="bulk-change-permission">Can delete?</label><div class="bulk-controls"><select id="bulk-permission" disabled><option value="clear">Clear — safe to delete</option><option value="ask">Ask first</option><option value="protected">Protected — do not delete</option></select></div></section>
           <section class="bulk-option" data-bulk-option="brand"><label class="bulk-toggle"><input class="selection" type="checkbox" id="bulk-change-brand">Brand</label><div class="bulk-controls"><select id="bulk-brand" disabled><option value="samsung">Samsung</option><option value="sandisk">SanDisk</option><option value="other">Other</option></select><input id="bulk-custom-brand" placeholder="Enter drive brand" disabled hidden></div></section>
+          <section class="bulk-option" data-bulk-option="format"><label class="bulk-toggle"><input class="selection" type="checkbox" id="bulk-change-format">Drive format</label><div class="bulk-controls"><select id="bulk-format" disabled><option value="unknown">Unknown / not checked</option><option value="exfat">exFAT</option><option value="apfs">APFS</option><option value="hfs-plus">Mac OS Extended (HFS+)</option><option value="ntfs">NTFS</option><option value="fat32">FAT32</option><option value="ext4">ext4</option><option value="other">Other</option></select><input id="bulk-custom-format" placeholder="Enter file system format" disabled hidden></div></section>
           <div class="modal-footer"><button type="button" class="button button-ghost" data-close="bulk">Cancel</button><button type="submit" class="button button-primary" id="save-bulk">Update selected drives</button></div>
         </form>
       </aside>
@@ -507,11 +519,14 @@
       const DELETE_LABELS = { clear: "Clear", ask: "Ask first", protected: "Protected" };
       const STATUS_ORDER = { waiting: 0, processing: 1, processed: 2 };
       const DELETE_ORDER = { clear: 0, ask: 1, protected: 2 };
-      const HISTORY_GROUPS = { status: "status", location: "location", locationType: "location", contents: "contents", totalGb: "capacity", spaceLeftGb: "capacity", deletePermission: "permission", brand: "brand", customBrand: "brand", photoName: "photo", record: "record", driveNumber: "record", label: "record", date: "record", note: "record" };
+      const FORMAT_LABELS = { unknown: "Unknown", exfat: "exFAT", apfs: "APFS", "hfs-plus": "HFS+", ntfs: "NTFS", fat32: "FAT32", ext4: "ext4", other: "Other" };
+      const OS_LABELS = { mac: "Mac", windows: "Windows", linux: "Linux" };
+      const WRITABLE_FORMATS = { mac: ["apfs", "hfs-plus", "exfat", "fat32"], windows: ["ntfs", "exfat", "fat32"], linux: ["ext4", "ntfs", "exfat", "fat32"] };
+      const HISTORY_GROUPS = { status: "status", location: "location", locationType: "location", contents: "contents", totalGb: "capacity", spaceLeftGb: "capacity", fileSystem: "format", customFileSystem: "format", deletePermission: "permission", brand: "brand", customBrand: "brand", photoName: "photo", record: "record", driveNumber: "record", label: "record", date: "record", note: "record" };
       const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
       const state = {
         drives: [], page: "inventory", search: "", status: "all", permission: "all",
-        sortKey: "driveNumber", sortDirection: "asc", summaryUnit: "GB", fitSize: null,
+        sortKey: "driveNumber", sortDirection: "asc", summaryUnit: "GB", fitSize: null, fitOs: "mac",
         selected: new Set(), editingId: null, modalHistory: [], globalHistory: [],
         historyLoaded: false, historySearch: "", historyFilter: "all", photoPreview: "",
         access: null,
@@ -545,16 +560,18 @@
       function accessIdentity(access) {
         const name = access.displayName || String(access.email || "").split("@")[0] || "Workspace user";
         const initial = name.trim().charAt(0) || "4";
-        return `<div class="access-identity"><span class="access-avatar">${escapeHtml(initial)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(access.email)}</span></div></div>`;
+        const emailLabel = access.email || "Email will be entered during signup";
+        return `<div class="access-identity"><span class="access-avatar">${escapeHtml(initial)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(emailLabel)}</span></div></div>`;
       }
 
       function accessRequestForm(access, rejected = false) {
         return `${rejected ? '<div class="access-alert">Your last request was not approved. You can update the details and submit it again.</div>' : ""}
           <p class="access-step">Email access</p>
           <h2>Request tracker access</h2>
-          <p class="access-intro">Your Google account email is verified. The tracker owner needs to approve it before you can view or edit drive records.</p>
+          <p class="access-intro">Enter the email the tracker owner should approve. This request is tied to your current Google session.</p>
           ${accessIdentity(access)}
           <form class="access-form" id="access-request-form">
+            <div class="access-field"><label for="access-email">Email</label><input id="access-email" type="email" maxlength="254" required value="${escapeHtml(access.email || "")}" ${access.email ? "readonly" : ""} autocomplete="email"></div>
             <div class="access-field"><label for="access-name">Name</label><input id="access-name" maxlength="120" required value="${escapeHtml(access.displayName || "")}" autocomplete="name"></div>
             <div class="access-field"><label for="access-note">Message to the owner <span style="font-weight:400;color:var(--muted)">(optional)</span></label><textarea id="access-note" maxlength="500" placeholder="Your team, role, or why you need tracker access">${escapeHtml(access.note || "")}</textarea><p class="access-helper">The owner will see your name, email, and this message.</p></div>
             <div class="access-alert" id="access-form-error" hidden></div>
@@ -643,7 +660,7 @@
         button.textContent = "Sending request…";
         errorBox.hidden = true;
         try {
-          const access = await serverJson("requestAccessJson", $("#access-name").value, $("#access-note").value);
+          const access = await serverJson("requestAccessJson", $("#access-email").value, $("#access-name").value, $("#access-note").value);
           renderAccessState(access);
         } catch (error) {
           errorBox.textContent = error.message || "Could not send the access request.";
@@ -721,6 +738,8 @@
         return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", ...(withTime ? { hour: "numeric", minute: "2-digit" } : {}) }).format(date);
       }
       function brandLabel(drive) { return drive.brand === "samsung" ? "Samsung" : drive.brand === "sandisk" ? "SanDisk" : (drive.customBrand || "Other"); }
+      function formatLabel(drive) { return drive.fileSystem === "other" ? (drive.customFileSystem || "Other") : (FORMAT_LABELS[drive.fileSystem] || "Unknown"); }
+      function isWritableOn(drive, os) { return (WRITABLE_FORMATS[os] || []).includes(drive.fileSystem); }
       function contentTags(value) { const tags = String(value || "").split(",").map(v => v.trim()).filter(Boolean); return tags.length ? tags.slice(0, 3) : ["Empty"]; }
       function capacityPercent(drive) { return drive.totalGb ? Math.min(100, Math.max(0, ((drive.totalGb - drive.spaceLeftGb) / drive.totalGb) * 100)) : 0; }
       function historyValue(field, value) {
@@ -728,6 +747,7 @@
         if (field === "status") return STATUS_LABELS[value] || String(value);
         if (field === "deletePermission") return DELETE_LABELS[value] || String(value);
         if (field === "brand") return value === "samsung" ? "Samsung" : value === "sandisk" ? "SanDisk" : "Other";
+        if (field === "fileSystem") return FORMAT_LABELS[value] || String(value);
         if (field === "locationType") return value === "4dv-studio" ? "4DV Studio" : value === "data-center" ? "Data Center" : "Other";
         if (field === "totalGb") return formatStorage(value);
         if (field === "spaceLeftGb") return formatGb(value);
@@ -796,7 +816,7 @@
       function filteredDrives() {
         const query = state.search.trim().toLowerCase();
         const drives = state.drives.filter(drive => {
-          const haystack = [drive.driveNumber, drive.label, drive.contents, drive.note, drive.location, brandLabel(drive)].join(" ").toLowerCase();
+          const haystack = [drive.driveNumber, drive.label, drive.contents, drive.note, drive.location, brandLabel(drive), formatLabel(drive)].join(" ").toLowerCase();
           return (!query || haystack.includes(query)) && (state.status === "all" || drive.status === state.status) && (state.permission === "all" || drive.deletePermission === state.permission);
         });
         return drives.sort((a, b) => {
@@ -805,6 +825,7 @@
           if (state.sortKey === "status") result = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
           if (state.sortKey === "contents") result = collator.compare(a.contents || a.note, b.contents || b.note);
           if (state.sortKey === "spaceLeftGb") result = a.spaceLeftGb - b.spaceLeftGb;
+          if (state.sortKey === "fileSystem") result = collator.compare(formatLabel(a), formatLabel(b));
           if (state.sortKey === "deletePermission") result = DELETE_ORDER[a.deletePermission] - DELETE_ORDER[b.deletePermission];
           if (state.sortKey === "location") result = collator.compare(a.location, b.location);
           if (state.sortKey === "updatedAt") result = String(a.updatedAt).localeCompare(String(b.updatedAt));
@@ -841,6 +862,7 @@
       }
       function statusPill(status) { return `<span class="status-pill status-${escapeHtml(status)}">${escapeHtml(STATUS_LABELS[status] || status)}</span>`; }
       function deletePill(permission) { return `<span class="delete-pill delete-${escapeHtml(permission)}">${escapeHtml(DELETE_LABELS[permission] || permission)}</span>`; }
+      function formatPill(drive) { return `<span class="format-pill format-${escapeHtml(drive.fileSystem || "unknown")}">${escapeHtml(formatLabel(drive))}</span>`; }
       function capacityMarkup(drive) {
         const used = capacityPercent(drive); const low = drive.totalGb && drive.spaceLeftGb / drive.totalGb < .12;
         return `<div><div class="capacity-line"><strong>${formatGb(drive.spaceLeftGb)}</strong><span>of ${formatStorage(drive.totalGb)}</span></div><div class="progress" aria-label="${Math.round(used)}% used"><span class="${low ? "low" : ""}" style="width:${used}%"></span></div></div>`;
@@ -852,11 +874,11 @@
         if (!drives.length) { wrap.innerHTML = '<div class="empty-state">No drives match this view. Try another filter or add a record.</div>'; return; }
         const allSelected = drives.every(drive => state.selected.has(drive.id));
         wrap.innerHTML = `
-          <table class="desktop-table"><colgroup><col style="width:4%"><col style="width:15%"><col style="width:13%"><col style="width:18%"><col style="width:12%"><col style="width:11%"><col style="width:11%"><col style="width:10%"><col style="width:6%"></colgroup>
-            <thead><tr><th><input class="selection" type="checkbox" data-action="select-visible" ${allSelected ? "checked" : ""}></th>${sortHeader("Hard drive # / brand", "driveNumber")}${sortHeader("Status", "status")}${sortHeader("Contents / 里面有什么", "contents")}${sortHeader("Space left", "spaceLeftGb")}${sortHeader("Can delete?", "deletePermission")}${sortHeader("Location", "location")}${sortHeader("Updated", "updatedAt")}<th></th></tr></thead>
-            <tbody>${drives.map(drive => `<tr class="${state.selected.has(drive.id) ? "selected" : ""}"><td><input class="selection" type="checkbox" data-action="select" data-id="${drive.id}" ${state.selected.has(drive.id) ? "checked" : ""}></td><td>${driveIdentity(drive)}</td><td>${statusPill(drive.status)}</td><td>${contentMarkup(drive)}</td><td>${capacityMarkup(drive)}</td><td>${deletePill(drive.deletePermission)}</td><td><span class="cell-subtle">${escapeHtml(drive.location || "—")}</span></td><td><span class="cell-subtle">${formatDate(drive.updatedAt, true)}</span></td><td><button class="row-action" data-action="edit" data-id="${drive.id}" aria-label="Edit ${escapeHtml(drive.driveNumber)}">→</button></td></tr>`).join("")}</tbody>
+          <table class="desktop-table"><colgroup><col style="width:4%"><col style="width:14%"><col style="width:12%"><col style="width:17%"><col style="width:12%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:8%"><col style="width:5%"></colgroup>
+            <thead><tr><th><input class="selection" type="checkbox" data-action="select-visible" ${allSelected ? "checked" : ""}></th>${sortHeader("Hard drive # / brand", "driveNumber")}${sortHeader("Status", "status")}${sortHeader("Contents / 里面有什么", "contents")}${sortHeader("Space left", "spaceLeftGb")}${sortHeader("Format", "fileSystem")}${sortHeader("Can delete?", "deletePermission")}${sortHeader("Location", "location")}${sortHeader("Updated", "updatedAt")}<th></th></tr></thead>
+            <tbody>${drives.map(drive => `<tr class="${state.selected.has(drive.id) ? "selected" : ""}"><td><input class="selection" type="checkbox" data-action="select" data-id="${drive.id}" ${state.selected.has(drive.id) ? "checked" : ""}></td><td>${driveIdentity(drive)}</td><td>${statusPill(drive.status)}</td><td>${contentMarkup(drive)}</td><td>${capacityMarkup(drive)}</td><td>${formatPill(drive)}</td><td>${deletePill(drive.deletePermission)}</td><td><span class="cell-subtle">${escapeHtml(drive.location || "—")}</span></td><td><span class="cell-subtle">${formatDate(drive.updatedAt, true)}</span></td><td><button class="row-action" data-action="edit" data-id="${drive.id}" aria-label="Edit ${escapeHtml(drive.driveNumber)}">→</button></td></tr>`).join("")}</tbody>
           </table>
-          <div class="mobile-cards">${drives.map(drive => `<article class="mobile-card ${state.selected.has(drive.id) ? "selected" : ""}"><div class="mobile-top"><div class="mobile-identity"><input class="selection" type="checkbox" data-action="select" data-id="${drive.id}" ${state.selected.has(drive.id) ? "checked" : ""}>${driveIdentity(drive)}</div><button class="row-action" data-action="edit" data-id="${drive.id}">→</button></div><div class="mobile-meta"><div><span class="mobile-label">Status</span>${statusPill(drive.status)}</div><div><span class="mobile-label">Can delete?</span>${deletePill(drive.deletePermission)}</div><div><span class="mobile-label">Location</span><span class="cell-subtle">${escapeHtml(drive.location || "—")}</span></div></div><div class="mobile-block"><span class="mobile-label">Contents</span>${contentMarkup(drive)}</div><div class="mobile-block"><span class="mobile-label">Capacity</span>${capacityMarkup(drive)}</div></article>`).join("")}</div>`;
+          <div class="mobile-cards">${drives.map(drive => `<article class="mobile-card ${state.selected.has(drive.id) ? "selected" : ""}"><div class="mobile-top"><div class="mobile-identity"><input class="selection" type="checkbox" data-action="select" data-id="${drive.id}" ${state.selected.has(drive.id) ? "checked" : ""}>${driveIdentity(drive)}</div><button class="row-action" data-action="edit" data-id="${drive.id}">→</button></div><div class="mobile-meta"><div><span class="mobile-label">Status</span>${statusPill(drive.status)}</div><div><span class="mobile-label">Format</span>${formatPill(drive)}</div><div><span class="mobile-label">Can delete?</span>${deletePill(drive.deletePermission)}</div><div><span class="mobile-label">Location</span><span class="cell-subtle">${escapeHtml(drive.location || "—")}</span></div></div><div class="mobile-block"><span class="mobile-label">Contents</span>${contentMarkup(drive)}</div><div class="mobile-block"><span class="mobile-label">Capacity</span>${capacityMarkup(drive)}</div></article>`).join("")}</div>`;
       }
 
       function renderSelection(visible) {
@@ -886,9 +908,9 @@
 
       function renderFitResults() {
         const result = $("#fit-result");
-        const candidates = state.drives.filter(drive => drive.spaceLeftGb >= state.fitSize).sort((a, b) => fitAvailability(a).rank - fitAvailability(b).rank || a.spaceLeftGb - b.spaceLeftGb);
-        if (!candidates.length) { result.innerHTML = `<span class="fit-empty">No drive has enough physical space for ${formatGb(state.fitSize)}.</span>`; return; }
-        result.innerHTML = `<div class="fit-result-head"><strong>${candidates.length} option${candidates.length === 1 ? "" : "s"} for ${formatGb(state.fitSize)}</strong><span>All drives with enough physical space</span></div><div class="fit-options">${candidates.map(drive => { const availability = fitAvailability(drive); return `<button class="fit-drive fit-${availability.tone}" data-action="edit" data-id="${drive.id}"><span><strong>${escapeHtml(drive.driveNumber)}</strong> · ${formatGb(drive.spaceLeftGb)} free</span><span class="fit-availability">${escapeHtml(availability.label)}</span></button>`; }).join("")}</div>`;
+        const candidates = state.drives.filter(drive => drive.spaceLeftGb >= state.fitSize && isWritableOn(drive, state.fitOs)).sort((a, b) => fitAvailability(a).rank - fitAvailability(b).rank || a.spaceLeftGb - b.spaceLeftGb);
+        if (!candidates.length) { result.innerHTML = `<span class="fit-empty">No ${escapeHtml(OS_LABELS[state.fitOs])}-writable drive has ${formatGb(state.fitSize)} free. Check each drive's format or choose another computer.</span>`; return; }
+        result.innerHTML = `<div class="fit-result-head"><strong>${candidates.length} ${escapeHtml(OS_LABELS[state.fitOs])}-compatible option${candidates.length === 1 ? "" : "s"}</strong><span>${formatGb(state.fitSize)} · writable formats only</span></div><div class="fit-options">${candidates.map(drive => { const availability = fitAvailability(drive); return `<button class="fit-drive fit-${availability.tone}" data-action="edit" data-id="${drive.id}"><span><strong>${escapeHtml(drive.driveNumber)}</strong> · ${formatGb(drive.spaceLeftGb)} free · ${escapeHtml(formatLabel(drive))}</span><span class="fit-availability">${escapeHtml(availability.label)}</span></button>`; }).join("")}</div>`;
       }
 
       function globalHistoryRows() {
@@ -924,7 +946,7 @@
         if (page === "history") loadGlobalHistory();
       }
 
-      function blankDrive() { return { driveNumber: "", label: "", date: today(), status: "waiting", totalGb: 4000, spaceLeftGb: 4000, contents: "", deletePermission: "ask", brand: "samsung", customBrand: "", locationType: "4dv-studio", location: "4DV Studio", note: "", photoName: "", photoKey: "" }; }
+      function blankDrive() { return { driveNumber: "", label: "", date: today(), status: "waiting", totalGb: 4000, spaceLeftGb: 4000, contents: "", deletePermission: "ask", brand: "samsung", customBrand: "", fileSystem: "unknown", customFileSystem: "", locationType: "4dv-studio", location: "4DV Studio", note: "", photoName: "", photoKey: "" }; }
       function openDriveModal(drive) {
         const value = drive || blankDrive();
         state.editingId = drive ? drive.id : null;
@@ -941,6 +963,8 @@
         $("#drive-date").value = value.date || today();
         $("#drive-brand").value = value.brand;
         $("#drive-custom-brand").value = value.customBrand || "";
+        $("#drive-format").value = value.fileSystem || "unknown";
+        $("#drive-custom-format").value = value.customFileSystem || "";
         $("#drive-permission").value = value.deletePermission;
         $("#drive-unit").value = value.totalGb >= 1000 ? "TB" : "GB";
         $("#drive-total").value = value.totalGb >= 1000 ? Number((value.totalGb / 1000).toFixed(3)) : value.totalGb;
@@ -993,6 +1017,8 @@
       function updateConditionalFields() {
         const customBrand = $("#drive-brand").value === "other";
         $("#custom-brand-field").hidden = !customBrand;
+        const customFormat = $("#drive-format").value === "other";
+        $("#custom-format-field").hidden = !customFormat;
         const customLocation = $("#drive-location-type").value === "other";
         $("#custom-location-field").hidden = !customLocation;
         $("#location-readout-field").hidden = customLocation;
@@ -1000,7 +1026,7 @@
       }
       function driveFormPayload() {
         const unit = $("#drive-unit").value; const totalInput = Number($("#drive-total").value);
-        return { id: state.editingId || undefined, driveNumber: $("#drive-number").value, label: $("#drive-label").value, date: $("#drive-date").value, status: $("#drive-status").value, totalGb: Math.round(unit === "TB" ? totalInput * 1000 : totalInput), spaceLeftGb: Math.round(Number($("#drive-free").value)), contents: $("#drive-contents").value, deletePermission: $("#drive-permission").value, brand: $("#drive-brand").value, customBrand: $("#drive-custom-brand").value, locationType: $("#drive-location-type").value, location: $("#drive-location").value, note: $("#drive-note").value };
+        return { id: state.editingId || undefined, driveNumber: $("#drive-number").value, label: $("#drive-label").value, date: $("#drive-date").value, status: $("#drive-status").value, totalGb: Math.round(unit === "TB" ? totalInput * 1000 : totalInput), spaceLeftGb: Math.round(Number($("#drive-free").value)), contents: $("#drive-contents").value, deletePermission: $("#drive-permission").value, brand: $("#drive-brand").value, customBrand: $("#drive-custom-brand").value, fileSystem: $("#drive-format").value, customFileSystem: $("#drive-custom-format").value, locationType: $("#drive-location-type").value, location: $("#drive-location").value, note: $("#drive-note").value };
       }
       async function saveDrive(event) {
         event.preventDefault(); const button = $("#save-drive"); button.disabled = true; button.textContent = "Saving…"; setModalError("drive", "");
@@ -1026,8 +1052,8 @@
         const selectedDrives = state.drives.filter(drive => state.selected.has(drive.id));
         $("#bulk-kicker").textContent = `${selectedDrives.length} selected drive${selectedDrives.length === 1 ? "" : "s"}`;
         $("#bulk-summary").innerHTML = selectedDrives.map(drive => `<span>${escapeHtml(drive.driveNumber)}</span>`).join("");
-        ["status", "location", "permission", "brand"].forEach(name => { $(`#bulk-change-${name}`).checked = false; updateBulkOption(name); });
-        $("#bulk-status").value = "waiting"; $("#bulk-location-type").value = "4dv-studio"; $("#bulk-location").value = ""; $("#bulk-permission").value = "ask"; $("#bulk-brand").value = "samsung"; $("#bulk-custom-brand").value = "";
+        ["status", "location", "permission", "brand", "format"].forEach(name => { $(`#bulk-change-${name}`).checked = false; updateBulkOption(name); });
+        $("#bulk-status").value = "waiting"; $("#bulk-location-type").value = "4dv-studio"; $("#bulk-location").value = ""; $("#bulk-permission").value = "ask"; $("#bulk-brand").value = "samsung"; $("#bulk-custom-brand").value = ""; $("#bulk-format").value = "unknown"; $("#bulk-custom-format").value = "";
         updateBulkConditional(); setModalError("bulk", ""); $("#bulk-modal").hidden = false; document.body.style.overflow = "hidden";
       }
       function updateBulkOption(name) {
@@ -1037,6 +1063,7 @@
       function updateBulkConditional() {
         const locationOther = $("#bulk-location-type").value === "other"; $("#bulk-location").hidden = !locationOther; $("#bulk-location").disabled = !$("#bulk-change-location").checked || !locationOther;
         const brandOther = $("#bulk-brand").value === "other"; $("#bulk-custom-brand").hidden = !brandOther; $("#bulk-custom-brand").disabled = !$("#bulk-change-brand").checked || !brandOther;
+        const formatOther = $("#bulk-format").value === "other"; $("#bulk-custom-format").hidden = !formatOther; $("#bulk-custom-format").disabled = !$("#bulk-change-format").checked || !formatOther;
       }
       async function saveBulk(event) {
         event.preventDefault(); const updates = {};
@@ -1044,6 +1071,7 @@
         if ($("#bulk-change-location").checked) { updates.locationType = $("#bulk-location-type").value; updates.location = $("#bulk-location").value; }
         if ($("#bulk-change-permission").checked) updates.deletePermission = $("#bulk-permission").value;
         if ($("#bulk-change-brand").checked) { updates.brand = $("#bulk-brand").value; updates.customBrand = $("#bulk-custom-brand").value; }
+        if ($("#bulk-change-format").checked) { updates.fileSystem = $("#bulk-format").value; updates.customFileSystem = $("#bulk-custom-format").value; }
         if (!Object.keys(updates).length) { setModalError("bulk", "Choose at least one field to update."); return; }
         const button = $("#save-bulk"); button.disabled = true; button.textContent = "Updating…";
         try { const result = await server("bulkUpdateDrives", [...state.selected], updates); state.selected.clear(); state.historyLoaded = false; await loadDrives(); closeModal("bulk"); showToast(`${result.changedCount} drive${result.changedCount === 1 ? "" : "s"} updated · history saved`); }
@@ -1078,9 +1106,11 @@
       $("#edit-selected").addEventListener("click", openBulkModal);
       $("#fit-form").addEventListener("submit", event => { event.preventDefault(); const size = Number($("#fit-size").value); if (!Number.isFinite(size) || size <= 0) { $("#fit-error").textContent = "Enter a file size greater than zero."; $("#fit-error").hidden = false; return; } $("#fit-error").hidden = true; state.fitSize = Math.round(size); renderFitResults(); });
       $("#fit-size").addEventListener("input", () => { state.fitSize = null; $("#fit-error").hidden = true; $("#fit-result").innerHTML = '<span class="fit-empty">Enter a size and select Search to see options.</span>'; });
+      $$('[data-fit-os]').forEach(button => button.addEventListener("click", () => { state.fitOs = button.dataset.fitOs; $$('[data-fit-os]').forEach(option => option.setAttribute("aria-pressed", option === button ? "true" : "false")); if (state.fitSize !== null) renderFitResults(); }));
       $("#history-search").addEventListener("input", event => { state.historySearch = event.target.value; if (state.historyLoaded) renderGlobalHistory(); });
       $("#history-filter").addEventListener("change", event => { state.historyFilter = event.target.value; if (state.historyLoaded) renderGlobalHistory(); });
       $("#drive-brand").addEventListener("change", updateConditionalFields);
+      $("#drive-format").addEventListener("change", updateConditionalFields);
       $("#drive-location-type").addEventListener("change", updateConditionalFields);
       $("#drive-unit").addEventListener("change", event => { const oldUnit = event.target.dataset.previous || (event.target.value === "TB" ? "GB" : "TB"); const value = Number($("#drive-total").value) || 0; $("#drive-total").value = event.target.value === "TB" ? Number((oldUnit === "GB" ? value / 1000 : value).toFixed(3)) : Math.round(oldUnit === "TB" ? value * 1000 : value); event.target.dataset.previous = event.target.value; });
       $("#photo-file").addEventListener("change", event => { const file = event.target.files && event.target.files[0]; if (!file) return; if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setModalError("drive", "Use a JPG, PNG, or WebP photo."); event.target.value = ""; return; } if (file.size > 8 * 1024 * 1024) { setModalError("drive", "Photo must be 8 MB or smaller."); event.target.value = ""; return; } const reader = new FileReader(); reader.onload = () => { state.photoPreview = reader.result; $("#photo-preview").innerHTML = `<img src="${reader.result}" alt="Selected hard drive">`; }; reader.readAsDataURL(file); $("#photo-name").textContent = file.name; $("#photo-button-label").textContent = "Replace photo"; });
@@ -1088,6 +1118,7 @@
       $("#remove-drive").addEventListener("click", removeCurrentDrive);
       $("#bulk-location-type").addEventListener("change", updateBulkConditional);
       $("#bulk-brand").addEventListener("change", updateBulkConditional);
+      $("#bulk-format").addEventListener("change", updateBulkConditional);
       $("#bulk-form").addEventListener("submit", saveBulk);
       $("#access-requests-button").addEventListener("click", openAccessAdmin);
       $("#access-list").addEventListener("click", event => { const button = event.target.closest("[data-access-decision]"); if (button) reviewAccess(button.dataset.accessEmail, button.dataset.accessDecision, button); });
