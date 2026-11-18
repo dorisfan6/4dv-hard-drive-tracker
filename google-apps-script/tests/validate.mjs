@@ -149,8 +149,14 @@ if (!html.includes("WRITABLE_FORMATS") || !html.includes("isWritableOn")) {
 if (html.includes('sortHeader("Status", "status")') || html.includes('<span class="mobile-label">Status</span>')) {
   throw new Error("Inventory still renders a Status column or mobile Status field.");
 }
-if (!html.includes('id="status-filters"') || !html.includes('id="drive-status"')) {
-  throw new Error("Status filtering or editing was removed with the inventory column.");
+for (const statusUi of ['id="status-filters"', 'id="drive-status"', 'data-bulk-option="status"', 'id="stat-processing"', '<option value="status">Status</option>']) {
+  if (html.includes(statusUi)) throw new Error(`Drive Status UI is still present: ${statusUi}`);
+}
+if (!html.includes('change.field !== "status"') || !html.includes('existing ? existing.status : "waiting"')) {
+  throw new Error("Hidden legacy status values are not safely preserved and excluded from History.");
+}
+if (!html.includes('.topbar { display: none; }')) {
+  throw new Error("The tracker top bar is still visible on mobile.");
 }
 if (!html.includes('id="open-signup"') || !html.includes('accessView:')) {
   throw new Error("The separate signup view is missing.");
