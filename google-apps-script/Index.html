@@ -154,10 +154,7 @@
       .drive-number { font-weight: 800; letter-spacing: -.01em; }
       .drive-label, .drive-brand, .cell-subtle { color: var(--muted); font-size: 12px; }
       .drive-brand { margin-top: 2px; color: #8a93a3; }
-      .status-pill, .delete-pill, .format-pill, .event-chip { display: inline-flex; align-items: center; min-height: 25px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 800; }
-      .status-waiting { background: var(--amber-soft); color: var(--amber); }
-      .status-processing { background: var(--blue-soft); color: var(--blue); }
-      .status-processed { background: var(--green-soft); color: var(--green); }
+      .delete-pill, .format-pill, .event-chip { display: inline-flex; align-items: center; min-height: 25px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 800; }
       .delete-clear { background: var(--green-soft); color: var(--green); }
       .delete-ask { background: var(--amber-soft); color: var(--amber); }
       .delete-protected { background: var(--red-soft); color: var(--red); }
@@ -304,7 +301,7 @@
         .toolbar { align-items: stretch; flex-direction: column; }
         .search-box { max-width: none; }
         .toolbar-filters { justify-content: space-between; overflow-x: auto; }
-        .desktop-table { min-width: 1120px; }
+        .desktop-table { min-width: 1020px; }
         .table-wrap { overflow-x: auto; }
       }
       @media (max-width: 720px) {
@@ -860,7 +857,6 @@
       function driveIdentity(drive) {
         return `<div class="drive-id"><span class="drive-glyph" aria-hidden="true"></span><div><div class="drive-number">${escapeHtml(drive.driveNumber)}</div><div class="drive-label">${escapeHtml(drive.label || "Unlabeled drive")}</div><div class="drive-brand">${escapeHtml(brandLabel(drive))}${drive.photoName ? " · Photo" : ""}</div></div></div>`;
       }
-      function statusPill(status) { return `<span class="status-pill status-${escapeHtml(status)}">${escapeHtml(STATUS_LABELS[status] || status)}</span>`; }
       function deletePill(permission) { return `<span class="delete-pill delete-${escapeHtml(permission)}">${escapeHtml(DELETE_LABELS[permission] || permission)}</span>`; }
       function formatPill(drive) { return `<span class="format-pill format-${escapeHtml(drive.fileSystem || "unknown")}">${escapeHtml(formatLabel(drive))}</span>`; }
       function capacityMarkup(drive) {
@@ -874,11 +870,11 @@
         if (!drives.length) { wrap.innerHTML = '<div class="empty-state">No drives match this view. Try another filter or add a record.</div>'; return; }
         const allSelected = drives.every(drive => state.selected.has(drive.id));
         wrap.innerHTML = `
-          <table class="desktop-table"><colgroup><col style="width:4%"><col style="width:14%"><col style="width:12%"><col style="width:17%"><col style="width:12%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:8%"><col style="width:5%"></colgroup>
-            <thead><tr><th><input class="selection" type="checkbox" data-action="select-visible" ${allSelected ? "checked" : ""}></th>${sortHeader("Hard drive # / brand", "driveNumber")}${sortHeader("Status", "status")}${sortHeader("Contents / 里面有什么", "contents")}${sortHeader("Space left", "spaceLeftGb")}${sortHeader("Format", "fileSystem")}${sortHeader("Can delete?", "deletePermission")}${sortHeader("Location", "location")}${sortHeader("Updated", "updatedAt")}<th></th></tr></thead>
-            <tbody>${drives.map(drive => `<tr class="${state.selected.has(drive.id) ? "selected" : ""}"><td><input class="selection" type="checkbox" data-action="select" data-id="${drive.id}" ${state.selected.has(drive.id) ? "checked" : ""}></td><td>${driveIdentity(drive)}</td><td>${statusPill(drive.status)}</td><td>${contentMarkup(drive)}</td><td>${capacityMarkup(drive)}</td><td>${formatPill(drive)}</td><td>${deletePill(drive.deletePermission)}</td><td><span class="cell-subtle">${escapeHtml(drive.location || "—")}</span></td><td><span class="cell-subtle">${formatDate(drive.updatedAt, true)}</span></td><td><button class="row-action" data-action="edit" data-id="${drive.id}" aria-label="Edit ${escapeHtml(drive.driveNumber)}">→</button></td></tr>`).join("")}</tbody>
+          <table class="desktop-table"><colgroup><col style="width:4%"><col style="width:15%"><col style="width:20%"><col style="width:13%"><col style="width:9%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:6%"></colgroup>
+            <thead><tr><th><input class="selection" type="checkbox" data-action="select-visible" ${allSelected ? "checked" : ""}></th>${sortHeader("Hard drive # / brand", "driveNumber")}${sortHeader("Contents / 里面有什么", "contents")}${sortHeader("Space left", "spaceLeftGb")}${sortHeader("Format", "fileSystem")}${sortHeader("Can delete?", "deletePermission")}${sortHeader("Location", "location")}${sortHeader("Updated", "updatedAt")}<th></th></tr></thead>
+            <tbody>${drives.map(drive => `<tr class="${state.selected.has(drive.id) ? "selected" : ""}"><td><input class="selection" type="checkbox" data-action="select" data-id="${drive.id}" ${state.selected.has(drive.id) ? "checked" : ""}></td><td>${driveIdentity(drive)}</td><td>${contentMarkup(drive)}</td><td>${capacityMarkup(drive)}</td><td>${formatPill(drive)}</td><td>${deletePill(drive.deletePermission)}</td><td><span class="cell-subtle">${escapeHtml(drive.location || "—")}</span></td><td><span class="cell-subtle">${formatDate(drive.updatedAt, true)}</span></td><td><button class="row-action" data-action="edit" data-id="${drive.id}" aria-label="Edit ${escapeHtml(drive.driveNumber)}">→</button></td></tr>`).join("")}</tbody>
           </table>
-          <div class="mobile-cards">${drives.map(drive => `<article class="mobile-card ${state.selected.has(drive.id) ? "selected" : ""}"><div class="mobile-top"><div class="mobile-identity"><input class="selection" type="checkbox" data-action="select" data-id="${drive.id}" ${state.selected.has(drive.id) ? "checked" : ""}>${driveIdentity(drive)}</div><button class="row-action" data-action="edit" data-id="${drive.id}">→</button></div><div class="mobile-meta"><div><span class="mobile-label">Status</span>${statusPill(drive.status)}</div><div><span class="mobile-label">Format</span>${formatPill(drive)}</div><div><span class="mobile-label">Can delete?</span>${deletePill(drive.deletePermission)}</div><div><span class="mobile-label">Location</span><span class="cell-subtle">${escapeHtml(drive.location || "—")}</span></div></div><div class="mobile-block"><span class="mobile-label">Contents</span>${contentMarkup(drive)}</div><div class="mobile-block"><span class="mobile-label">Capacity</span>${capacityMarkup(drive)}</div></article>`).join("")}</div>`;
+          <div class="mobile-cards">${drives.map(drive => `<article class="mobile-card ${state.selected.has(drive.id) ? "selected" : ""}"><div class="mobile-top"><div class="mobile-identity"><input class="selection" type="checkbox" data-action="select" data-id="${drive.id}" ${state.selected.has(drive.id) ? "checked" : ""}>${driveIdentity(drive)}</div><button class="row-action" data-action="edit" data-id="${drive.id}">→</button></div><div class="mobile-meta"><div><span class="mobile-label">Format</span>${formatPill(drive)}</div><div><span class="mobile-label">Can delete?</span>${deletePill(drive.deletePermission)}</div><div><span class="mobile-label">Location</span><span class="cell-subtle">${escapeHtml(drive.location || "—")}</span></div></div><div class="mobile-block"><span class="mobile-label">Contents</span>${contentMarkup(drive)}</div><div class="mobile-block"><span class="mobile-label">Capacity</span>${capacityMarkup(drive)}</div></article>`).join("")}</div>`;
       }
 
       function renderSelection(visible) {

@@ -146,6 +146,12 @@ if (!html.includes('id="drive-format"') || !html.includes('data-fit-os="mac"')) 
 if (!html.includes("WRITABLE_FORMATS") || !html.includes("isWritableOn")) {
   throw new Error("Capacity search does not filter by writable drive format.");
 }
+if (html.includes('sortHeader("Status", "status")') || html.includes('<span class="mobile-label">Status</span>')) {
+  throw new Error("Inventory still renders a Status column or mobile Status field.");
+}
+if (!html.includes('id="status-filters"') || !html.includes('id="drive-status"')) {
+  throw new Error("Status filtering or editing was removed with the inventory column.");
+}
 if (!html.includes('id="open-signup"') || !html.includes('accessView:')) {
   throw new Error("The separate signup view is missing.");
 }
