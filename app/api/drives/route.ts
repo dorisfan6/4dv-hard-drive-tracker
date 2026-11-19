@@ -8,6 +8,7 @@ import {
   summarizeChanges,
   type DriveRecord,
 } from "../../../db/drive-store";
+import { authorizeTrackerApi } from "../../tracker-access";
 
 type DrivePayload = {
   id?: number;
@@ -174,6 +175,8 @@ function errorResponse(error: unknown) {
 }
 
 export async function GET(request: Request) {
+  const authorization = await authorizeTrackerApi();
+  if (authorization.error) return authorization.error;
   try {
     const d1 = await ensureDriveDatabase();
     const url = new URL(request.url);
@@ -269,6 +272,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const authorization = await authorizeTrackerApi();
+  if (authorization.error) return authorization.error;
   try {
     const d1 = await ensureDriveDatabase();
     const drive = cleanPayload((await request.json()) as DrivePayload);
@@ -316,6 +321,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const authorization = await authorizeTrackerApi();
+  if (authorization.error) return authorization.error;
   try {
     const d1 = await ensureDriveDatabase();
     const payload = (await request.json()) as DrivePayload;
@@ -415,6 +422,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const authorization = await authorizeTrackerApi();
+  if (authorization.error) return authorization.error;
   try {
     const d1 = await ensureDriveDatabase();
     const payload = (await request.json()) as DrivePayload;

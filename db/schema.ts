@@ -42,3 +42,17 @@ export const appState = sqliteTable("app_state", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
+
+export const trackerUsers = sqliteTable(
+  "tracker_users",
+  {
+    email: text("email").primaryKey(),
+    displayName: text("display_name").notNull().default(""),
+    note: text("note").notNull().default(""),
+    status: text("status").notNull().default("pending"),
+    requestedAt: text("requested_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    reviewedAt: text("reviewed_at").notNull().default(""),
+    reviewedBy: text("reviewed_by").notNull().default(""),
+  },
+  (table) => [index("tracker_users_status_idx").on(table.status, table.requestedAt)],
+);

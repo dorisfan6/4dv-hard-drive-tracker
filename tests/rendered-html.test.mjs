@@ -2,14 +2,19 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("build contains the finished 4DV Studio hard drive tracker", async () => {
-  const [dashboard, driveApi, photoApi, home, layout, hosting] = await Promise.all([
+test("build contains the protected 4DV Studio hard drive tracker", async () => {
+  const [dashboard, driveApi, photoApi, home, signup, layout, hosting, accessApi, accessGate, accessAdmin, accessStore] = await Promise.all([
     readFile(new URL("../app/DriveDashboard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/drives/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/drives/photo/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/signup/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../dist/.openai/hosting.json", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/access/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/AccessGate.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/AccessAdmin.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../db/access-store.ts", import.meta.url), "utf8"),
     access(new URL("../dist/server/index.js", import.meta.url)),
   ]);
 
@@ -40,10 +45,25 @@ test("build contains the finished 4DV Studio hard drive tracker", async () => {
   assert.match(dashboard, /width: "6%"/);
   assert.match(driveApi, /bulk-updated/);
   assert.match(driveApi, /Select between 1 and 100 valid drives/);
-  assert.doesNotMatch(driveApi, /requireTrackerAccess|tracker-auth/);
-  assert.doesNotMatch(photoApi, /requireTrackerAccess|tracker-auth/);
-  assert.doesNotMatch(home, /redirect|cookies|tracker-auth|\/access/);
-  assert.doesNotMatch(dashboard, /\/api\/access|>Lock</);
+  assert.match(driveApi, /authorizeTrackerApi/);
+  assert.match(photoApi, /authorizeTrackerApi/);
+  assert.match(home, /getTrackerAccess/);
+  assert.match(home, /AccessGate/);
+  assert.match(home, /redirect\("\/signup"\)/);
+  assert.match(signup, /mode="signup"/);
+  assert.match(signup, /chatGPTSignInPath\("\/signup"\)/);
+  assert.match(dashboard, /Access requests/);
+  assert.match(dashboard, /\/access/);
+  assert.match(accessApi, /requestTrackerAccess/);
+  assert.match(accessApi, /reviewTrackerAccessRequest/);
+  assert.match(accessGate, /Register for access/);
+  assert.match(accessGate, /Request owner approval/);
+  assert.match(accessGate, /Create an account/);
+  assert.match(accessGate, /Log in with email account/);
+  assert.match(accessAdmin, /Approve/);
+  assert.match(accessAdmin, /Reject/);
+  assert.match(accessStore, /CREATE TABLE IF NOT EXISTS tracker_users/);
+  assert.match(accessStore, /yinuofan@4dv\.ai/);
   assert.match(layout, /4DV Studio — Hard Drive Tracking System/);
   assert.doesNotMatch(
     dashboard,
